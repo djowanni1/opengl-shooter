@@ -241,7 +241,7 @@ int main(int argc, char **argv) {
 
     // Load and create a texture
     GLuint texture1 = loadTexture("../container.jpg");
-    //GLuint texture2 = loadTexture("../awesomeface.png");
+    GLuint texture2 = loadTexture("../awesomeface.png");
 
     vector<std::string> faces{
             "../bg/right.jpg",
@@ -251,11 +251,11 @@ int main(int argc, char **argv) {
             "../bg/front.jpg",
             "../bg/back.jpg"
     };
-    //GLuint texture3 = loadCubemap(faces);
+    GLuint texture3 = loadCubemap(faces);
 
-//    sky_shader.StartUseShader();
-//    sky_shader.SetUniform("skybox", 0);
-//    sky_shader.StopUseShader();
+    sky_shader.StartUseShader();
+    sky_shader.SetUniform("skybox", 0);
+    sky_shader.StopUseShader();
 
     //цикл обработки сообщений и отрисовки сцены каждый кадр
 
@@ -270,87 +270,68 @@ int main(int argc, char **argv) {
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
+        float4x4 view = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));
 
-        // draw scene as normal
+        float4x4 projection = transpose(
+                projectionMatrixTransposed(45.0f, (GLfloat) WIDTH / (GLfloat) HEIGHT, 0.1f, 100.0f));
+
+        float4x4 model;
+
+        /// sky
+        glDepthMask(GL_FALSE);
+        sky_shader.StartUseShader();
+        view.row[0].w = 0.0f;
+        view.row[1].w = 0.0f;
+        view.row[2].w = 0.0f;
+        sky_shader.SetUniform("view", view);
+        sky_shader.SetUniform("projection", projection);
+        glBindVertexArray(skyVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, texture3);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glDepthMask(GL_TRUE);
+        glBindVertexArray(0);
+        sky_shader.StopUseShader();
+
+        /// draw scene as normal
         objects_shader.StartUseShader();
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture1);
         objects_shader.SetUniform("Texture1", 0);
-//        glActiveTexture(GL_TEXTURE0 + 1);
-//        glBindTexture(GL_TEXTURE_2D, texture2);
-//        objects_shader.SetUniform("Texture2", 1);
+        glActiveTexture(GL_TEXTURE0 + 1);
+        glBindTexture(GL_TEXTURE_2D, texture2);
+        //objects_shader.SetUniform("Texture2", 1);
 
-        float4x4 view = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));
+        view = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));
         objects_shader.SetUniform("view", view);
-
-        float4x4 projection = transpose(
-                projectionMatrixTransposed(45.0f, (GLfloat) WIDTH / (GLfloat) HEIGHT, 0.1f, 100.0f));
         objects_shader.SetUniform("projection", projection);
 
-        float4x4 model;
-
         glBindVertexArray(VAO);
-
 
         model = translate4x4(float3(0.0f, 0.0f, 0.0f));
         objects_shader.SetUniform("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 36);
 
-
         model = rotate_X_4x4(45.0);
         model = mul(translate4x4(float3(10.0f, 10.0f, 0.0f)), model);
         objects_shader.SetUniform("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 36);
+
         glBindVertexArray(0);
         GL_CHECK_ERRORS;
         objects_shader.StopUseShader();
         // !cubes
-
         glfwSwapBuffers(window);
-//        glBindVertexArray(VAO);
-//
-//
-//
-//
-//
-//        //objects_shader.SetUniform("view", view);
-//
-//        float4x4 model = translate4x4(float3(0.0f, 0.0f, 0.0f));
-//        objects_shader.SetUniform("model", model);
-//        objects_shader.SetUniform("tex_type", 0);
-//        glDrawArrays(GL_TRIANGLES, 0, 36);
-//
-//        model = rotate_X_4x4(45.0);
-//        model = mul(translate4x4(float3(10.0f, 10.0f, 0.0f)), model);
-//        objects_shader.SetUniform("model", model);
-//        objects_shader.SetUniform("tex_type", 1);
-//        glDrawArrays(GL_TRIANGLES, 0, 36);
-//
-//        //model = translate4x4(float3(10.0f, 10.0f, 0.0f));
-//        //view = transpose(lookAtTransposed(cameraPos, cameraPos + float3(0.0f, 0.0f, -1.0f), float3(0.0f, 1.0f, 0.0f)));
-//        //view[]
-////        glDepthFunc(GL_LEQUAL);
-////        float4x4 cubeview = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));;
-////        cubeview.row[0].w = 0.0f;
-////        cubeview.row[1].w = 0.0f;
-////        cubeview.row[2].w = 0.0f;
-////        objects_shader.SetUniform("view", cubeview);
-////        objects_shader.SetUniform("tex_type", 2);
-////        glDrawArrays(GL_TRIANGLES, 0, 36);
-////        glDepthFunc(GL_LESS);
-//
-//        glBindVertexArray(0);
-//
-//        GL_CHECK_ERRORS;
-
-
     }
 
-    //очищаем vboи vao перед закрытием программы
+    //очищаем vbo и vao перед закрытием программы
     //
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
+
+    glDeleteVertexArrays(1, &skyVAO);
+    glDeleteBuffers(1, &skyVBO);
 
     glfwTerminate();
     return 0;
