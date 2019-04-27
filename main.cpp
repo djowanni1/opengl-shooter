@@ -4,34 +4,43 @@
 #include "LiteMath.h"
 //External dependencies
 #define GLFW_DLL
-#define _USE_MATH_DEFINES
+
+#include <SOIL.h>
 #include <GLFW/glfw3.h>
 #include <random>
 #include <cmath>
+#include <vector>
+#include <string>
 
+using std::vector;
+using std::string;
 using namespace LiteMath;
 static const GLsizei WIDTH = 640, HEIGHT = 480; //размеры окна
 
 GLfloat lastX = WIDTH / 2, lastY = HEIGHT / 2;
 
-GLfloat yaw   = -M_PI_2;
+GLfloat yaw = -M_PI_2;
 GLfloat pitch = 0.0f;
 bool firstMouse = false;
-float3 cameraPos    = float3(0.0f, 0.0f, 3.0f);
+float3 cameraPos = float3(0.0f, 0.0f, 3.0f);
 
-float3 cameraFront  = float3(0.0f, 0.0f, -1.0f);
-float3 cameraUp     = float3(0.0f, 1.0f,  0.0f);
+float3 cameraFront = float3(0.0f, 0.0f, -1.0f);
+float3 cameraUp = float3(0.0f, 1.0f, 0.0f);
 
 bool keys[1024];
 
 GLfloat deltaTime = 0.0f;
 GLfloat lastFrame = 0.0f;
 
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode);
-void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode);
+
+void mouse_callback(GLFWwindow *window, double xpos, double ypos);
+
 void do_movement();
 
-float4x4 perspective(float fov, float aspect, float znear, float zfar){
+unsigned int loadCubemap(vector<std::string> faces);
+
+float4x4 perspective(float fov, float aspect, float znear, float zfar) {
 
     float xymax = znear * tan(fov * M_PI / 360);
     float ymin = -xymax;
@@ -91,7 +100,8 @@ int main(int argc, char **argv) {
     }
 
     glfwMakeContextCurrent(window);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    // ???
+    //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
     glfwSetKeyCallback(window, key_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
@@ -99,6 +109,9 @@ int main(int argc, char **argv) {
     if (initGL() != 0)
         return -1;
 
+    glViewport(0, 0, WIDTH, HEIGHT);
+
+    glEnable(GL_DEPTH_TEST);
     //Reset any OpenGL errors which could be present for some reason
     GLenum gl_error = glGetError();
     while (gl_error != GL_NO_ERROR)
@@ -114,76 +127,161 @@ int main(int argc, char **argv) {
 
     glfwSwapInterval(1); // force 60 frames per second
 
+
+
     //Создаем и загружаем геометрию поверхности
     //
-    GLuint g_vertexBufferObject;
-    GLuint g_vertexArrayObject;
-    {
-        GLfloat vertices[] = {
-                -0.5f, -0.5f, -0.5f,
-                0.5f, -0.5f, -0.5f,
-                0.5f,  0.5f, -0.5f,
-                0.5f,  0.5f, -0.5f,
-                -0.5f,  0.5f, -0.5f,
-                -0.5f, -0.5f, -0.5f,
 
-                -0.5f, -0.5f,  0.5f,
-                0.5f, -0.5f,  0.5f,
-                0.5f,  0.5f,  0.5f,
-                0.5f,  0.5f,  0.5f,
-                -0.5f,  0.5f,  0.5f,
-                -0.5f, -0.5f,  0.5f,
 
-                -0.5f,  0.5f,  0.5f,
-                -0.5f,  0.5f, -0.5f,
-                -0.5f, -0.5f, -0.5f,
-                -0.5f, -0.5f, -0.5f,
-                -0.5f, -0.5f,  0.5f,
-                -0.5f,  0.5f,  0.5f,
+    GLfloat vertices[] = {
+            -1.0f, 1.0f, -1.0f, 0.0f, 1.0f,
+            -1.0f, -1.0f, -1.0f, 0.0f, 0.0f,
+            1.0f, -1.0f, -1.0f, 1.0f, 0.0f,
+            1.0f, -1.0f, -1.0f, 1.0f, 0.0f,
+            1.0f, 1.0f, -1.0f, 1.0f, 1.0f,
+            -1.0f, 1.0f, -1.0f, 0.0f, 1.0f,
 
-                0.5f,  0.5f,  0.5f,
-                0.5f,  0.5f, -0.5f,
-                0.5f, -0.5f, -0.5f,
-                0.5f, -0.5f, -0.5f,
-                0.5f, -0.5f,  0.5f,
-                0.5f,  0.5f,  0.5f,
+            -1.0f, -1.0f, 1.0f, 0.0f, 1.0f,
+            -1.0f, -1.0f, -1.0f, 0.0f, 0.0f,
+            -1.0f, 1.0f, -1.0f, 1.0f, 0.0f,
+            -1.0f, 1.0f, -1.0f, 1.0f, 0.0f,
+            -1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+            -1.0f, -1.0f, 1.0f, 0.0f, 1.0f,
 
-                -0.5f, -0.5f, -0.5f,
-                0.5f, -0.5f, -0.5f,
-                0.5f, -0.5f,  0.5f,
-                0.5f, -0.5f,  0.5f,
-                -0.5f, -0.5f,  0.5f,
-                -0.5f, -0.5f, -0.5f,
+            1.0f, -1.0f, -1.0f, 0.0f, 0.0f,
+            1.0f, -1.0f, 1.0f, 0.0f, 1.0f,
+            1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+            1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+            1.0f, 1.0f, -1.0f, 1.0f, 0.0f,
+            1.0f, -1.0f, -1.0f, 0.0f, 0.0f,
 
-                -0.5f,  0.5f, -0.5f,
-                0.5f,  0.5f, -0.5f,
-                0.5f,  0.5f,  0.5f,
-                0.5f,  0.5f,  0.5f,
-                -0.5f,  0.5f,  0.5f,
-                -0.5f,  0.5f, -0.5f,
-        };
+            -1.0f, -1.0f, 1.0f, 0.0f, 0.0f,
+            -1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
+            1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+            1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+            1.0f, -1.0f, 1.0f, 1.0f, 0.0f,
+            -1.0f, -1.0f, 1.0f, 0.0f, 0.0f,
 
-        g_vertexBufferObject = 0;
-        GLuint vertexLocation = 0; // simple layout, assume have only positions at location = 0
+            -1.0f, 1.0f, -1.0f, 0.0f, 0.0f,
+            1.0f, 1.0f, -1.0f, 1.0f, 0.0f,
+            1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+            1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+            -1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
+            -1.0f, 1.0f, -1.0f, 0.0f, 0.0f,
 
-        glGenVertexArrays(1, &g_vertexArrayObject);
-        glGenBuffers(1, &g_vertexBufferObject);
+            -1.0f, -1.0f, -1.0f, 0.0f, 0.0f,
+            -1.0f, -1.0f, 1.0f, 0.0f, 1.0f,
+            1.0f, -1.0f, -1.0f, 1.0f, 0.0f,
+            1.0f, -1.0f, -1.0f, 1.0f, 0.0f,
+            -1.0f, -1.0f, 1.0f, 0.0f, 1.0f,
+            1.0f, -1.0f, 1.0f, 1.0f, 1.0f
+    };
+    GLuint VBO;
+    GLuint VAO;
 
-        glBindVertexArray(g_vertexArrayObject);
+    VBO = 0;
 
-        glBindBuffer(GL_ARRAY_BUFFER, g_vertexBufferObject);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
 
-        //1 - location, 2 - vec3, 3 - type, 4 - normalize, 5 - offset, 6 - 0
+    glBindVertexArray(VAO);
 
-        glVertexAttribPointer(vertexLocation, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-        glEnableVertexAttribArray(vertexLocation);
-        //glVertexAttribPointer(vertexLocation, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-        glBindVertexArray(0);
-    }
+    // Position attribute
+    GLuint vertexLocation = 0; // simple layout, assume have only positions at location = 0
+
+    //1 - location, 2 - vec3, 3 - type, 4 - normalize, 5 - offset, 6 - 0
+    glVertexAttribPointer(vertexLocation, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (0));
+    glEnableVertexAttribArray(vertexLocation);
+    //glVertexAttribPointer(vertexLocation, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    // Texture attribute
+    GLuint texLocation = 2;
+    glVertexAttribPointer(texLocation, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (3 * sizeof(GLfloat)));
+    glEnableVertexAttribArray(texLocation);
+
+    glBindVertexArray(0);
+
+
+
+    // Load and create a texture
+
+
+
+    // ====================
+    // Texture 1
+    // ====================
+    GLuint texture1;
+    glGenTextures(1, &texture1);
+    glBindTexture(GL_TEXTURE_2D,
+                  texture1); // All upcoming GL_TEXTURE_2D operations now have effect on our texture object
+    // Set our texture parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);    // Set texture wrapping to GL_REPEAT
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // Set texture filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // Load, create texture and generate mipmaps
+    int width, height;
+    unsigned char *image = SOIL_load_image("../container.jpg", &width, &height, 0, SOIL_LOAD_RGB);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    SOIL_free_image_data(image);
+    glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture when done, so we won't accidentily mess up our texture.
+
+    // ===================
+    // Texture 2
+    // ===================
+    GLuint texture2;
+    glGenTextures(1, &texture2);
+    glBindTexture(GL_TEXTURE_2D, texture2);
+    // Set our texture parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // Set texture filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // Load, create texture and generate mipmaps
+    image = SOIL_load_image("../awesomeface.png", &width, &height, 0, SOIL_LOAD_RGB);
+    //SOIL_save_image("../mda.bmp", SOIL_SAVE_TYPE_BMP, width, height, 3, image);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    SOIL_free_image_data(image);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // ===================
+    // Texture 3
+    // ===================
+    vector<std::string> faces{
+            "../bg/right.jpg",
+            "../bg/left.jpg",
+            "../bg/top.jpg",
+            "../bg/bottom.jpg",
+            "../bg/front.jpg",
+            "../bg/back.jpg"
+    };
+    GLuint texture3 = loadCubemap(faces);
+
+//    GLuint texture3;
+//    glGenTextures(1, &texture3);
+//    glBindTexture(GL_TEXTURE_2D, texture3);
+//    // Set our texture parameters
+//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+//    // Set texture filtering
+//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+//    // Load, create texture and generate mipmaps
+//    image = SOIL_load_image("../mw.jpg", &width, &height, 0, SOIL_LOAD_RGB);
+//    //SOIL_save_image("../mda.bmp", SOIL_SAVE_TYPE_BMP, width, height, 3, image);
+//    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+//    glGenerateMipmap(GL_TEXTURE_2D);
+//    SOIL_free_image_data(image);
+//    glBindTexture(GL_TEXTURE_2D, 0);
 
     //цикл обработки сообщений и отрисовки сцены каждый кадр
+
     while (!glfwWindowShouldClose(window)) {
 
         glfwPollEvents();
@@ -192,38 +290,70 @@ int main(int argc, char **argv) {
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
         do_movement();
+
         //очищаем экран каждый кадр
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         GL_CHECK_ERRORS;
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         GL_CHECK_ERRORS;
 
         program.StartUseShader();
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture1);
+        program.SetUniform("Texture1", 0);
+        glActiveTexture(GL_TEXTURE0 + 1);
+        glBindTexture(GL_TEXTURE_2D, texture2);
+        program.SetUniform("Texture2", 1);
+        glActiveTexture(GL_TEXTURE0 + 2);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, texture3);
+        program.SetUniform("Texture3", 2);
+
         GL_CHECK_ERRORS;
 
         float4x4 view = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));
         program.SetUniform("view", view);
 
-        float4x4 projection = transpose(projectionMatrixTransposed(45.0f, (GLfloat)WIDTH / (GLfloat)HEIGHT, 0.1f, 100.0f));
+        float4x4 projection = transpose(
+                projectionMatrixTransposed(45.0f, (GLfloat) WIDTH / (GLfloat) HEIGHT, 0.1f, 100.0f));
         program.SetUniform("projection", projection);
+
+
+        glBindVertexArray(VAO);
+
+
+
+
+
+        //program.SetUniform("view", view);
 
         float4x4 model = translate4x4(float3(0.0f, 0.0f, 0.0f));
         program.SetUniform("model", model);
-
-        // очистка и заполнение экрана цветом
-        //
-        glViewport(0, 0, WIDTH, HEIGHT);
-        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-
-        // draw call
-        //
-        glBindVertexArray(g_vertexArrayObject);
-        GL_CHECK_ERRORS;
+        program.SetUniform("tex_type", 0);
         glDrawArrays(GL_TRIANGLES, 0, 36);
-        GL_CHECK_ERRORS;  // The last parameter of glDrawArrays is equal to VS invocations
 
+        model = rotate_X_4x4(45.0);
+        model = mul(translate4x4(float3(10.0f, 10.0f, 0.0f)), model);
+        program.SetUniform("model", model);
+        program.SetUniform("tex_type", 1);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
 
+        //model = translate4x4(float3(10.0f, 10.0f, 0.0f));
+        //view = transpose(lookAtTransposed(cameraPos, cameraPos + float3(0.0f, 0.0f, -1.0f), float3(0.0f, 1.0f, 0.0f)));
+        //view[]
+//        glDepthFunc(GL_LEQUAL);
+//        float4x4 cubeview = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));;
+//        cubeview.row[0].w = 0.0f;
+//        cubeview.row[1].w = 0.0f;
+//        cubeview.row[2].w = 0.0f;
+//        program.SetUniform("view", cubeview);
+//        program.SetUniform("tex_type", 2);
+//        glDrawArrays(GL_TRIANGLES, 0, 36);
+//        glDepthFunc(GL_LESS);
+
+        glBindVertexArray(0);
+
+        GL_CHECK_ERRORS;
         program.StopUseShader();
 
         glfwSwapBuffers(window);
@@ -231,20 +361,18 @@ int main(int argc, char **argv) {
 
     //очищаем vboи vao перед закрытием программы
     //
-    glDeleteVertexArrays(1, &g_vertexArrayObject);
-    glDeleteBuffers(1, &g_vertexBufferObject);
+    glDeleteVertexArrays(1, &VAO);
+    glDeleteBuffers(1, &VBO);
 
     glfwTerminate();
     return 0;
 }
 
 
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
-{
+void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode) {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
-    if (key >= 0 && key < 1024)
-    {
+    if (key >= 0 && key < 1024) {
         if (action == GLFW_PRESS)
             keys[key] = true;
         else if (action == GLFW_RELEASE)
@@ -252,8 +380,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     }
 }
 
-void do_movement()
-{
+void do_movement() {
     // Camera controls
     GLfloat cameraSpeed = 5.0f * deltaTime;
     if (keys[GLFW_KEY_W])
@@ -270,10 +397,8 @@ void do_movement()
         cameraPos += normalize(cross(cameraFront, cameraUp)) * cameraSpeed;
 }
 
-void mouse_callback(GLFWwindow* window, double xpos, double ypos)
-{
-    if(firstMouse)
-    {
+void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
+    if (firstMouse) {
         lastX = xpos;
         lastY = ypos;
         firstMouse = false;
@@ -288,7 +413,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     xoffset *= sensitivity;
     yoffset *= sensitivity;
 
-    yaw   += xoffset;
+    yaw += xoffset;
     pitch += yoffset;
 
 //    if(pitch > M_PI_2)
@@ -301,4 +426,34 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     front.y = sin(pitch);
     front.z = sin(yaw) * cos(pitch);
     cameraFront = normalize(front);
+}
+
+unsigned int loadCubemap(vector<std::string> faces) {
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+    int width, height, nrChannels;
+    for (unsigned int i = 0; i < faces.size(); i++) {
+        unsigned char *data = SOIL_load_image(faces[i].c_str(), &width, &height, &nrChannels, 0);
+        //stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
+        if (data) {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                         0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data
+            );
+            SOIL_free_image_data(data);
+            //stbi_image_free(data);
+        } else {
+            std::cout << "Cubemap texture failed to load at path: " << faces[i] << std::endl;
+            SOIL_free_image_data(data);
+            // stbi_image_free(data);
+        }
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    return textureID;
 }
