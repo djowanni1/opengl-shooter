@@ -40,30 +40,13 @@ void do_movement();
 
 unsigned int loadCubemap(vector<std::string> faces);
 
-float4x4 perspective(float fov, float aspect, float znear, float zfar) {
+unsigned int load_texture(const char *image_name);
+unsigned int loadTexture(char const * path);
 
-    float xymax = znear * tan(fov * M_PI / 360);
-    float ymin = -xymax;
-    float xmin = -xymax;
-
-    float width = xymax - xmin;
-    float height = xymax - ymin;
-
-    float depth = zfar - znear;
-    float q = -(zfar + znear) / depth;
-    float qn = -2 * (zfar * znear) / depth;
-
-    float w = 2 * znear / width;
-    w = w / aspect;
-    float h = 2 * znear / height;
-    float data[] = {
-            w, 0, 0, 0,
-            0, h, 0, 0,
-            0, 0, q, -1,
-            0, 0, qn, 1
-    };
-
-    return float4x4(data);
+inline void speed_control(){
+    GLfloat currentFrame = glfwGetTime();
+    deltaTime = currentFrame - lastFrame;
+    lastFrame = currentFrame;
 }
 
 int initGL() {
@@ -100,8 +83,7 @@ int main(int argc, char **argv) {
     }
 
     glfwMakeContextCurrent(window);
-    // ???
-    //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
     glfwSetKeyCallback(window, key_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
@@ -120,9 +102,14 @@ int main(int argc, char **argv) {
     //создание шейдерной программы из двух файлов с исходниками шейдеров
     //используется класс-обертка ShaderProgram
     std::unordered_map<GLenum, std::string> shaders;
+
     shaders[GL_VERTEX_SHADER] = "vertex.glsl";
     shaders[GL_FRAGMENT_SHADER] = "fragment.glsl";
-    ShaderProgram program(shaders);
+    ShaderProgram objects_shader(shaders);
+
+    shaders[GL_VERTEX_SHADER] = "sky_vs.glsl";
+    shaders[GL_FRAGMENT_SHADER] = "sky_fs.glsl";
+    ShaderProgram sky_shader(shaders);
     GL_CHECK_ERRORS;
 
     glfwSwapInterval(1); // force 60 frames per second
@@ -130,129 +117,132 @@ int main(int argc, char **argv) {
 
 
     //Создаем и загружаем геометрию поверхности
-    //
+    float vertices[] = {
+            // positions          // texture Coords
+            -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+            0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
+            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+            -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
 
+            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+            0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+            0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+            -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
+            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
 
-    GLfloat vertices[] = {
-            -1.0f, 1.0f, -1.0f, 0.0f, 1.0f,
-            -1.0f, -1.0f, -1.0f, 0.0f, 0.0f,
-            1.0f, -1.0f, -1.0f, 1.0f, 0.0f,
-            1.0f, -1.0f, -1.0f, 1.0f, 0.0f,
-            1.0f, 1.0f, -1.0f, 1.0f, 1.0f,
-            -1.0f, 1.0f, -1.0f, 0.0f, 1.0f,
+            -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+            -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+            -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
 
-            -1.0f, -1.0f, 1.0f, 0.0f, 1.0f,
-            -1.0f, -1.0f, -1.0f, 0.0f, 0.0f,
-            -1.0f, 1.0f, -1.0f, 1.0f, 0.0f,
-            -1.0f, 1.0f, -1.0f, 1.0f, 0.0f,
-            -1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-            -1.0f, -1.0f, 1.0f, 0.0f, 1.0f,
+            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+            0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+            0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+            0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
 
-            1.0f, -1.0f, -1.0f, 0.0f, 0.0f,
-            1.0f, -1.0f, 1.0f, 0.0f, 1.0f,
-            1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-            1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-            1.0f, 1.0f, -1.0f, 1.0f, 0.0f,
-            1.0f, -1.0f, -1.0f, 0.0f, 0.0f,
+            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+            0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
+            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
 
-            -1.0f, -1.0f, 1.0f, 0.0f, 0.0f,
-            -1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
-            1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-            1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-            1.0f, -1.0f, 1.0f, 1.0f, 0.0f,
-            -1.0f, -1.0f, 1.0f, 0.0f, 0.0f,
-
-            -1.0f, 1.0f, -1.0f, 0.0f, 0.0f,
-            1.0f, 1.0f, -1.0f, 1.0f, 0.0f,
-            1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-            1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-            -1.0f, 1.0f, 1.0f, 0.0f, 1.0f,
-            -1.0f, 1.0f, -1.0f, 0.0f, 0.0f,
-
-            -1.0f, -1.0f, -1.0f, 0.0f, 0.0f,
-            -1.0f, -1.0f, 1.0f, 0.0f, 1.0f,
-            1.0f, -1.0f, -1.0f, 1.0f, 0.0f,
-            1.0f, -1.0f, -1.0f, 1.0f, 0.0f,
-            -1.0f, -1.0f, 1.0f, 0.0f, 1.0f,
-            1.0f, -1.0f, 1.0f, 1.0f, 1.0f
+            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+            -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
+            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
     };
-    GLuint VBO;
-    GLuint VAO;
+    float sky_vertices[] = {
+            // positions
+            -1.0f,  1.0f, -1.0f,
+            -1.0f, -1.0f, -1.0f,
+            1.0f, -1.0f, -1.0f,
+            1.0f, -1.0f, -1.0f,
+            1.0f,  1.0f, -1.0f,
+            -1.0f,  1.0f, -1.0f,
 
-    VBO = 0;
+            -1.0f, -1.0f,  1.0f,
+            -1.0f, -1.0f, -1.0f,
+            -1.0f,  1.0f, -1.0f,
+            -1.0f,  1.0f, -1.0f,
+            -1.0f,  1.0f,  1.0f,
+            -1.0f, -1.0f,  1.0f,
 
+            1.0f, -1.0f, -1.0f,
+            1.0f, -1.0f,  1.0f,
+            1.0f,  1.0f,  1.0f,
+            1.0f,  1.0f,  1.0f,
+            1.0f,  1.0f, -1.0f,
+            1.0f, -1.0f, -1.0f,
+
+            -1.0f, -1.0f,  1.0f,
+            -1.0f,  1.0f,  1.0f,
+            1.0f,  1.0f,  1.0f,
+            1.0f,  1.0f,  1.0f,
+            1.0f, -1.0f,  1.0f,
+            -1.0f, -1.0f,  1.0f,
+
+            -1.0f,  1.0f, -1.0f,
+            1.0f,  1.0f, -1.0f,
+            1.0f,  1.0f,  1.0f,
+            1.0f,  1.0f,  1.0f,
+            -1.0f,  1.0f,  1.0f,
+            -1.0f,  1.0f, -1.0f,
+
+            -1.0f, -1.0f, -1.0f,
+            -1.0f, -1.0f,  1.0f,
+            1.0f, -1.0f, -1.0f,
+            1.0f, -1.0f, -1.0f,
+            -1.0f, -1.0f,  1.0f,
+            1.0f, -1.0f,  1.0f
+    };
+
+    //glVertexAttribPointer(location, data_len, type, normalize, stride, (GLvoid *)(offset))
+
+    // box VAO
+    GLuint VBO, VAO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
-
     glBindVertexArray(VAO);
-
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    // Position attribute
-    GLuint vertexLocation = 0; // simple layout, assume have only positions at location = 0
-
-    //1 - location, 2 - vec3, 3 - type, 4 - normalize, 5 - offset, 6 - 0
-    glVertexAttribPointer(vertexLocation, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (0));
+    GLuint vertexLocation = 0;
     glEnableVertexAttribArray(vertexLocation);
-    //glVertexAttribPointer(vertexLocation, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    // Texture attribute
-    GLuint texLocation = 2;
-    glVertexAttribPointer(texLocation, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (3 * sizeof(GLfloat)));
-    glEnableVertexAttribArray(texLocation);
+    glVertexAttribPointer(vertexLocation, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (0));
 
+    GLuint textureLocation = 2;
+    glEnableVertexAttribArray(textureLocation);
+    glVertexAttribPointer(textureLocation, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (3 * sizeof(GLfloat)));
     glBindVertexArray(0);
+
+    // Sky VAO
+    GLuint skyVBO, skyVAO;
+    glGenVertexArrays(1, &skyVAO);
+    glGenBuffers(1, &skyVBO);
+    glBindVertexArray(skyVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, skyVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(sky_vertices), sky_vertices, GL_STATIC_DRAW);
+
+    GLuint skyLocation = 0;
+    glEnableVertexAttribArray(skyLocation);
+    glVertexAttribPointer(skyLocation, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid *) (0));
 
 
 
     // Load and create a texture
+    GLuint texture1 = loadTexture("../container.jpg");
+    //GLuint texture2 = loadTexture("../awesomeface.png");
 
-
-
-    // ====================
-    // Texture 1
-    // ====================
-    GLuint texture1;
-    glGenTextures(1, &texture1);
-    glBindTexture(GL_TEXTURE_2D,
-                  texture1); // All upcoming GL_TEXTURE_2D operations now have effect on our texture object
-    // Set our texture parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);    // Set texture wrapping to GL_REPEAT
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    // Set texture filtering
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // Load, create texture and generate mipmaps
-    int width, height;
-    unsigned char *image = SOIL_load_image("../container.jpg", &width, &height, 0, SOIL_LOAD_RGB);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
-    glGenerateMipmap(GL_TEXTURE_2D);
-    SOIL_free_image_data(image);
-    glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture when done, so we won't accidentily mess up our texture.
-
-    // ===================
-    // Texture 2
-    // ===================
-    GLuint texture2;
-    glGenTextures(1, &texture2);
-    glBindTexture(GL_TEXTURE_2D, texture2);
-    // Set our texture parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    // Set texture filtering
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // Load, create texture and generate mipmaps
-    image = SOIL_load_image("../awesomeface.png", &width, &height, 0, SOIL_LOAD_RGB);
-    //SOIL_save_image("../mda.bmp", SOIL_SAVE_TYPE_BMP, width, height, 3, image);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
-    glGenerateMipmap(GL_TEXTURE_2D);
-    SOIL_free_image_data(image);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    // ===================
-    // Texture 3
-    // ===================
     vector<std::string> faces{
             "../bg/right.jpg",
             "../bg/left.jpg",
@@ -261,102 +251,100 @@ int main(int argc, char **argv) {
             "../bg/front.jpg",
             "../bg/back.jpg"
     };
-    GLuint texture3 = loadCubemap(faces);
+    //GLuint texture3 = loadCubemap(faces);
 
-//    GLuint texture3;
-//    glGenTextures(1, &texture3);
-//    glBindTexture(GL_TEXTURE_2D, texture3);
-//    // Set our texture parameters
-//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-//    // Set texture filtering
-//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-//    // Load, create texture and generate mipmaps
-//    image = SOIL_load_image("../mw.jpg", &width, &height, 0, SOIL_LOAD_RGB);
-//    //SOIL_save_image("../mda.bmp", SOIL_SAVE_TYPE_BMP, width, height, 3, image);
-//    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
-//    glGenerateMipmap(GL_TEXTURE_2D);
-//    SOIL_free_image_data(image);
-//    glBindTexture(GL_TEXTURE_2D, 0);
+//    sky_shader.StartUseShader();
+//    sky_shader.SetUniform("skybox", 0);
+//    sky_shader.StopUseShader();
 
     //цикл обработки сообщений и отрисовки сцены каждый кадр
 
     while (!glfwWindowShouldClose(window)) {
-
         glfwPollEvents();
 
-        GLfloat currentFrame = glfwGetTime();
-        deltaTime = currentFrame - lastFrame;
-        lastFrame = currentFrame;
+        // Camera movements
+        speed_control();
         do_movement();
 
         //очищаем экран каждый кадр
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        GL_CHECK_ERRORS;
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-        GL_CHECK_ERRORS;
 
-        program.StartUseShader();
+
+        // draw scene as normal
+        objects_shader.StartUseShader();
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture1);
-        program.SetUniform("Texture1", 0);
-        glActiveTexture(GL_TEXTURE0 + 1);
-        glBindTexture(GL_TEXTURE_2D, texture2);
-        program.SetUniform("Texture2", 1);
-        glActiveTexture(GL_TEXTURE0 + 2);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, texture3);
-        program.SetUniform("Texture3", 2);
-
-        GL_CHECK_ERRORS;
+        objects_shader.SetUniform("Texture1", 0);
+//        glActiveTexture(GL_TEXTURE0 + 1);
+//        glBindTexture(GL_TEXTURE_2D, texture2);
+//        objects_shader.SetUniform("Texture2", 1);
 
         float4x4 view = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));
-        program.SetUniform("view", view);
+        objects_shader.SetUniform("view", view);
 
         float4x4 projection = transpose(
                 projectionMatrixTransposed(45.0f, (GLfloat) WIDTH / (GLfloat) HEIGHT, 0.1f, 100.0f));
-        program.SetUniform("projection", projection);
+        objects_shader.SetUniform("projection", projection);
 
+        float4x4 model;
 
         glBindVertexArray(VAO);
 
 
-
-
-
-        //program.SetUniform("view", view);
-
-        float4x4 model = translate4x4(float3(0.0f, 0.0f, 0.0f));
-        program.SetUniform("model", model);
-        program.SetUniform("tex_type", 0);
+        model = translate4x4(float3(0.0f, 0.0f, 0.0f));
+        objects_shader.SetUniform("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 36);
+
 
         model = rotate_X_4x4(45.0);
         model = mul(translate4x4(float3(10.0f, 10.0f, 0.0f)), model);
-        program.SetUniform("model", model);
-        program.SetUniform("tex_type", 1);
+        objects_shader.SetUniform("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 36);
-
-        //model = translate4x4(float3(10.0f, 10.0f, 0.0f));
-        //view = transpose(lookAtTransposed(cameraPos, cameraPos + float3(0.0f, 0.0f, -1.0f), float3(0.0f, 1.0f, 0.0f)));
-        //view[]
-//        glDepthFunc(GL_LEQUAL);
-//        float4x4 cubeview = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));;
-//        cubeview.row[0].w = 0.0f;
-//        cubeview.row[1].w = 0.0f;
-//        cubeview.row[2].w = 0.0f;
-//        program.SetUniform("view", cubeview);
-//        program.SetUniform("tex_type", 2);
-//        glDrawArrays(GL_TRIANGLES, 0, 36);
-//        glDepthFunc(GL_LESS);
-
         glBindVertexArray(0);
-
         GL_CHECK_ERRORS;
-        program.StopUseShader();
+        objects_shader.StopUseShader();
+        // !cubes
 
         glfwSwapBuffers(window);
+//        glBindVertexArray(VAO);
+//
+//
+//
+//
+//
+//        //objects_shader.SetUniform("view", view);
+//
+//        float4x4 model = translate4x4(float3(0.0f, 0.0f, 0.0f));
+//        objects_shader.SetUniform("model", model);
+//        objects_shader.SetUniform("tex_type", 0);
+//        glDrawArrays(GL_TRIANGLES, 0, 36);
+//
+//        model = rotate_X_4x4(45.0);
+//        model = mul(translate4x4(float3(10.0f, 10.0f, 0.0f)), model);
+//        objects_shader.SetUniform("model", model);
+//        objects_shader.SetUniform("tex_type", 1);
+//        glDrawArrays(GL_TRIANGLES, 0, 36);
+//
+//        //model = translate4x4(float3(10.0f, 10.0f, 0.0f));
+//        //view = transpose(lookAtTransposed(cameraPos, cameraPos + float3(0.0f, 0.0f, -1.0f), float3(0.0f, 1.0f, 0.0f)));
+//        //view[]
+////        glDepthFunc(GL_LEQUAL);
+////        float4x4 cubeview = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));;
+////        cubeview.row[0].w = 0.0f;
+////        cubeview.row[1].w = 0.0f;
+////        cubeview.row[2].w = 0.0f;
+////        objects_shader.SetUniform("view", cubeview);
+////        objects_shader.SetUniform("tex_type", 2);
+////        glDrawArrays(GL_TRIANGLES, 0, 36);
+////        glDepthFunc(GL_LESS);
+//
+//        glBindVertexArray(0);
+//
+//        GL_CHECK_ERRORS;
+
+
     }
 
     //очищаем vboи vao перед закрытием программы
@@ -454,6 +442,63 @@ unsigned int loadCubemap(vector<std::string> faces) {
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    return textureID;
+}
+
+unsigned int load_texture(const char* filename){
+    GLuint texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    // Set our texture parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    // Set texture filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // Load, create texture and generate mipmaps
+    int width, height;
+    unsigned char *image = SOIL_load_image(filename, &width, &height, 0, SOIL_LOAD_RGB);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    SOIL_free_image_data(image);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    GL_CHECK_ERRORS;
+    return texture;
+}
+
+unsigned int loadTexture(char const * path) {
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+
+    int width, height, nrComponents;
+    unsigned char *data = SOIL_load_image(path, &width, &height, &nrComponents, SOIL_LOAD_RGB);
+    if (data)
+    {
+        GLenum format;
+        if (nrComponents == 1)
+            format = GL_RED;
+        else if (nrComponents == 3)
+            format = GL_RGB;
+        else if (nrComponents == 4)
+            format = GL_RGBA;
+
+        glBindTexture(GL_TEXTURE_2D, textureID);
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        SOIL_free_image_data(data);
+    }
+    else
+    {
+        std::cout << "Texture failed to load at path: " << path << std::endl;
+        SOIL_free_image_data(data);
+    }
 
     return textureID;
 }

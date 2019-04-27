@@ -4,20 +4,11 @@ in vec3 BgCoord;
 
 out vec4 color;
 
-uniform int tex_type;
-
 uniform sampler2D Texture1;
-uniform sampler2D Texture2;
-uniform samplerCube Texture3;
+//uniform sampler2D Texture2;
 
 void main() {
-    if (tex_type == 0) {
-        color = texture(Texture1, TexCoord);
-    } else if (tex_type == 1) {
-        color = texture(Texture2, TexCoord);
-    } else if (tex_type == 2) {
-        color = texture(Texture3, vec3(BgCoord.x, BgCoord.y, BgCoord.z));
-    }
+    color = texture(Texture1, TexCoord);
     //sampler2D *textures[] = {&(Texture1), &Texture2, &Texture3};
     //color = texture(textures[tex_type], TexCoord);
 
