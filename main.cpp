@@ -220,7 +220,7 @@ int main(int argc, char **argv) {
     glEnableVertexAttribArray(vertexLocation);
     glVertexAttribPointer(vertexLocation, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (0));
 
-    GLuint textureLocation = 2;
+    GLuint textureLocation = 1;
     glEnableVertexAttribArray(textureLocation);
     glVertexAttribPointer(textureLocation, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (3 * sizeof(GLfloat)));
     glBindVertexArray(0);
@@ -236,7 +236,7 @@ int main(int argc, char **argv) {
     GLuint skyLocation = 0;
     glEnableVertexAttribArray(skyLocation);
     glVertexAttribPointer(skyLocation, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid *) (0));
-
+    glBindVertexArray(0);
 
 
     // Load and create a texture
