@@ -80,6 +80,32 @@ namespace LiteMath {
         float4 row[4];
     };
 
+    struct float3x3 {
+        float3x3() { identity(); }
+
+        float3x3(const float arr[9]) {
+            row[0] = float3(arr[0], arr[1], arr[2]);
+            row[1] = float3(arr[3], arr[4], arr[5]);
+            row[2] = float3(arr[6], arr[7], arr[8]);
+        }
+
+        void identity() {
+            row[0] = float3(1, 0, 0);
+            row[1] = float3(0, 1, 0);
+            row[2] = float3(0, 0, 1);
+        }
+
+        float &M(int x, int y) { return ((float *) row)[y * 3 + x]; }
+
+        float M(int x, int y) const { return ((float *) row)[y * 3 + x]; }
+
+        float *L() { return (float *) row; }
+
+        const float *L() const { return (float *) row; }
+
+        float3 row[3];
+    };
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     struct uchar4 {

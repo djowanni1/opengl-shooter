@@ -11,11 +11,14 @@
 #include <cmath>
 #include <vector>
 #include <string>
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
 
 using std::vector;
 using std::string;
 using namespace LiteMath;
-static const GLsizei WIDTH = 640, HEIGHT = 480; //размеры окна
+static const GLsizei WIDTH = 640, HEIGHT = 640; //размеры окна
 
 GLfloat lastX = WIDTH / 2, lastY = HEIGHT / 2;
 
@@ -24,13 +27,15 @@ GLfloat pitch = 0.0f;
 bool firstMouse = false;
 float3 cameraPos = float3(0.0f, 0.0f, 3.0f);
 
-float3 cameraFront = float3(0.0f, 0.0f, -1.0f);
-float3 cameraUp = float3(0.0f, 1.0f, 0.0f);
+float3 cameraFront = normalize(float3(0.0f, 0.0f, -1.0f));
+float3 cameraUp = normalize(float3(0.0f, 1.0f, 0.0f));
 
 bool keys[1024];
 
 GLfloat deltaTime = 0.0f;
 GLfloat lastFrame = 0.0f;
+
+
 
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode);
 
@@ -42,6 +47,45 @@ unsigned int loadCubemap(vector<std::string> faces);
 
 unsigned int load_texture(const char *image_name);
 unsigned int loadTexture(char const * path);
+
+
+
+class SpriteAnimator {
+private:
+    int count_frames;
+    float fps;
+    float step;
+    int stride_x, stride_y;
+    float scale_x, scale_y;
+    void UpdateStep(){
+        step += deltaTime * fps;
+        if (step > count_frames){
+            step -= count_frames;
+        }
+    }
+public:
+    GLuint texture;
+    SpriteAnimator(const char *path, int stride_x, int stride_y, int count_frames, float fps)
+    : texture(loadTexture(path))
+    , stride_x(stride_x)
+    , stride_y(stride_y)
+    , scale_x(1.0 / stride_x)
+    , scale_y(1.0 / stride_y)
+    , count_frames(count_frames)
+    , fps(fps)
+    , step(0){};
+
+    float3x3 animation(){
+        UpdateStep();
+        int off = int(step);
+        float arr[] = {
+                scale_x, 0.0, off % stride_x * scale_x,
+                0.0, scale_y, off / stride_y * scale_y,
+                0.0, 0.0, 1.0
+        };
+        return float3x3(arr);
+    }
+};
 
 inline void speed_control(){
     GLfloat currentFrame = glfwGetTime();
@@ -83,8 +127,7 @@ int main(int argc, char **argv) {
     }
 
     glfwMakeContextCurrent(window);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
     glfwSetKeyCallback(window, key_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
 
@@ -94,6 +137,9 @@ int main(int argc, char **argv) {
     glViewport(0, 0, WIDTH, HEIGHT);
 
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     //Reset any OpenGL errors which could be present for some reason
     GLenum gl_error = glGetError();
     while (gl_error != GL_NO_ERROR)
@@ -110,13 +156,17 @@ int main(int argc, char **argv) {
     shaders[GL_VERTEX_SHADER] = "sky_vs.glsl";
     shaders[GL_FRAGMENT_SHADER] = "sky_fs.glsl";
     ShaderProgram sky_shader(shaders);
+
+    shaders[GL_VERTEX_SHADER] = "sprite_vs.glsl";
+    shaders[GL_FRAGMENT_SHADER] = "sprite_fs.glsl";
+    ShaderProgram sprite_shader(shaders);
     GL_CHECK_ERRORS;
 
     glfwSwapInterval(1); // force 60 frames per second
 
+    //glVertexAttribPointer(location, data_len, type, normalize, stride, (GLvoid *)(offset))
 
-
-    //Создаем и загружаем геометрию поверхности
+    // box VAO
     float vertices[] = {
             // positions          // texture Coords
             -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
@@ -161,6 +211,50 @@ int main(int argc, char **argv) {
             -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
             -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
     };
+    GLuint VBO, VAO;
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    GLuint vertexLocation = 0;
+    glEnableVertexAttribArray(vertexLocation);
+    glVertexAttribPointer(vertexLocation, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (0));
+
+    GLuint textureLocation = 1;
+    glEnableVertexAttribArray(textureLocation);
+    glVertexAttribPointer(textureLocation, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (3 * sizeof(GLfloat)));
+    glBindVertexArray(0);
+
+    // Plane VAO
+    float plane_vertices[] = {
+            // positions          // texture Coords
+            -0.5f, -0.5f, 0.0f, 0.0f, 0.0f,
+            0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
+            0.5f, 0.5f, 0.0f, 1.0f, 1.0f,
+            0.5f, 0.5f, 0.0f, 1.0f, 1.0f,
+            -0.5f, 0.5f, 0.0f, 0.0f, 1.0f,
+            -0.5f, -0.5f, 0.0f, 0.0f, 0.0f,
+    };
+
+    GLuint planeVBO, planeVAO;
+    glGenVertexArrays(1, &planeVAO);
+    glGenBuffers(1, &planeVBO);
+    glBindVertexArray(planeVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(plane_vertices), plane_vertices, GL_STATIC_DRAW);
+
+    GLuint planeLocation = 0;
+    glEnableVertexAttribArray(planeLocation);
+    glVertexAttribPointer(planeLocation, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (0));
+
+    GLuint planetexLocation = 1;
+    glEnableVertexAttribArray(planetexLocation);
+    glVertexAttribPointer(planetexLocation, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (3 * sizeof(GLfloat)));
+    glBindVertexArray(0);
+
+    // Sky VAO
     float sky_vertices[] = {
             // positions
             -1.0f,  1.0f, -1.0f,
@@ -205,27 +299,6 @@ int main(int argc, char **argv) {
             -1.0f, -1.0f,  1.0f,
             1.0f, -1.0f,  1.0f
     };
-
-    //glVertexAttribPointer(location, data_len, type, normalize, stride, (GLvoid *)(offset))
-
-    // box VAO
-    GLuint VBO, VAO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    GLuint vertexLocation = 0;
-    glEnableVertexAttribArray(vertexLocation);
-    glVertexAttribPointer(vertexLocation, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (0));
-
-    GLuint textureLocation = 1;
-    glEnableVertexAttribArray(textureLocation);
-    glVertexAttribPointer(textureLocation, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (3 * sizeof(GLfloat)));
-    glBindVertexArray(0);
-
-    // Sky VAO
     GLuint skyVBO, skyVAO;
     glGenVertexArrays(1, &skyVAO);
     glGenBuffers(1, &skyVBO);
@@ -243,6 +316,19 @@ int main(int argc, char **argv) {
     GLuint texture1 = loadTexture("../container.jpg");
     GLuint texture2 = loadTexture("../awesomeface.png");
 
+    objects_shader.StartUseShader();
+    objects_shader.SetUniform("Texture", 0);
+    objects_shader.StopUseShader();
+
+    SpriteAnimator boom("../boom.png", 9, 9, 81, 25);
+    SpriteAnimator asteroid1("../asteroid1.png", 8, 8, 32, 25);
+    SpriteAnimator asteroid2("../asteroid2.png", 5, 6, 30, 10);
+    //SpriteAnimator asteroid3("../asteroid3.png", 5, 6, 25, 15);
+
+    sprite_shader.StartUseShader();
+    sprite_shader.SetUniform("Texture", 0);
+    sprite_shader.StopUseShader();
+
     vector<std::string> faces{
             "../bg/right.jpg",
             "../bg/left.jpg",
@@ -251,13 +337,18 @@ int main(int argc, char **argv) {
             "../bg/front.jpg",
             "../bg/back.jpg"
     };
-    GLuint texture3 = loadCubemap(faces);
+    GLuint background_tex = loadCubemap(faces);
 
     sky_shader.StartUseShader();
     sky_shader.SetUniform("skybox", 0);
     sky_shader.StopUseShader();
 
-    //цикл обработки сообщений и отрисовки сцены каждый кадр
+    std::vector<float3> asteroid_positions = {
+            {0.0, 0.0, -10.0},
+            {0.0, 0.0, -20.0},
+            {0.0, 0.0, -30.0},
+            {0.0, 0.0, -40.0}
+    };
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -266,7 +357,7 @@ int main(int argc, char **argv) {
         speed_control();
         do_movement();
 
-        //очищаем экран каждый кадр
+        // Clear window
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
@@ -276,36 +367,43 @@ int main(int argc, char **argv) {
                 projectionMatrixTransposed(45.0f, (GLfloat) WIDTH / (GLfloat) HEIGHT, 0.1f, 100.0f));
 
         float4x4 model;
+        /// Start shader ->
+        /// set view and projection matrix ->
+        /// activate texture ->
+        /// bind VAO ->
+        /// model matrix + draw ->
+        /// unbind VAO -> stop shader
 
         /// sky
         glDepthMask(GL_FALSE);
         sky_shader.StartUseShader();
+
         view.row[0].w = 0.0f;
         view.row[1].w = 0.0f;
         view.row[2].w = 0.0f;
         sky_shader.SetUniform("view", view);
         sky_shader.SetUniform("projection", projection);
-        glBindVertexArray(skyVAO);
+
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, texture3);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, background_tex);
+
+        glBindVertexArray(skyVAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
-        glDepthMask(GL_TRUE);
+
         glBindVertexArray(0);
         sky_shader.StopUseShader();
+        glDepthMask(GL_TRUE);
 
-        /// draw scene as normal
+
+        /// objects
         objects_shader.StartUseShader();
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture1);
-        objects_shader.SetUniform("Texture1", 0);
-        glActiveTexture(GL_TEXTURE0 + 1);
-        glBindTexture(GL_TEXTURE_2D, texture2);
-        //objects_shader.SetUniform("Texture2", 1);
 
         view = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));
         objects_shader.SetUniform("view", view);
         objects_shader.SetUniform("projection", projection);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture1);
 
         glBindVertexArray(VAO);
 
@@ -313,25 +411,76 @@ int main(int argc, char **argv) {
         objects_shader.SetUniform("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 36);
 
-        model = rotate_X_4x4(45.0);
-        model = mul(translate4x4(float3(10.0f, 10.0f, 0.0f)), model);
-        objects_shader.SetUniform("model", model);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+//        model = rotate_X_4x4(45.0);
+//        model = mul(translate4x4(float3(10.0f, 10.0f, 0.0f)), model);
+//        objects_shader.SetUniform("model", model);
+//        glDrawArrays(GL_TRIANGLES, 0, 36);
 
         glBindVertexArray(0);
-        GL_CHECK_ERRORS;
         objects_shader.StopUseShader();
-        // !cubes
+
+        /// Sprites
+        sprite_shader.StartUseShader();
+
+        sprite_shader.SetUniform("view", view);
+        sprite_shader.SetUniform("projection", projection);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, boom.texture);
+
+        glBindVertexArray(planeVAO);
+
+        model = translate4x4(float3(0.0f, 0.0f, -5.0f));
+        sprite_shader.SetUniform("model", model);
+        sprite_shader.SetUniform("animation", boom.animation());
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, asteroid1.texture);
+        for (auto position : asteroid_positions){
+            model = translate4x4(position);
+            sprite_shader.SetUniform("model", model);
+            sprite_shader.SetUniform("animation", asteroid1.animation());
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
+//        model = translate4x4(float3(0.0f, -5.0f, -5.0f));
+//        sprite_shader.SetUniform("model", model);
+//        sprite_shader.SetUniform("animation", asteroid1.animation());
+//        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, asteroid2.texture);
+
+        model = translate4x4(float3(10.0f, -5.0f, -5.0f));
+        sprite_shader.SetUniform("model", model);
+        sprite_shader.SetUniform("animation", asteroid2.animation());
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+//        glActiveTexture(GL_TEXTURE0);
+//        glBindTexture(GL_TEXTURE_2D, asteroid3.texture);
+//
+//        model = translate4x4(float3(10.0f, 5.0f, -2.5f));
+//        sprite_shader.SetUniform("model", model);
+//        sprite_shader.SetUniform("animation", asteroid3.animation());
+//        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        glBindVertexArray(0);
+        sprite_shader.StopUseShader();
+
+
+        GL_CHECK_ERRORS;
+
         glfwSwapBuffers(window);
     }
 
-    //очищаем vbo и vao перед закрытием программы
-    //
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
 
     glDeleteVertexArrays(1, &skyVAO);
     glDeleteBuffers(1, &skyVBO);
+
+    glDeleteVertexArrays(1, &planeVAO);
+    glDeleteBuffers(1, &planeVBO);
 
     glfwTerminate();
     return 0;
@@ -405,6 +554,7 @@ unsigned int loadCubemap(vector<std::string> faces) {
     int width, height, nrChannels;
     for (unsigned int i = 0; i < faces.size(); i++) {
         unsigned char *data = SOIL_load_image(faces[i].c_str(), &width, &height, &nrChannels, 0);
+        std::cout << SOIL_last_result() << std::endl;
         //stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
         if (data) {
             glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
@@ -453,7 +603,7 @@ unsigned int loadTexture(char const * path) {
     glGenTextures(1, &textureID);
 
     int width, height, nrComponents;
-    unsigned char *data = SOIL_load_image(path, &width, &height, &nrComponents, SOIL_LOAD_RGB);
+    unsigned char *data = SOIL_load_image(path, &width, &height, &nrComponents, 0);
     if (data)
     {
         GLenum format;
@@ -483,3 +633,5 @@ unsigned int loadTexture(char const * path) {
 
     return textureID;
 }
+
+

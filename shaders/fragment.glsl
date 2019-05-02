@@ -4,11 +4,11 @@ in vec3 BgCoord;
 
 out vec4 color;
 
-uniform sampler2D Texture1;
+uniform sampler2D Texture;
 //uniform sampler2D Texture2;
 
 void main() {
-    color = texture(Texture1, TexCoord);
+    color = texture(Texture, TexCoord);
     //sampler2D *textures[] = {&(Texture1), &Texture2, &Texture3};
     //color = texture(textures[tex_type], TexCoord);
 

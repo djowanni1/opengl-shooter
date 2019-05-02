@@ -37,6 +37,8 @@ public:
 
   void SetUniform(const std::string &location, LiteMath::float4x4) const;
 
+  void SetUniform(const std::string &location, LiteMath::float3x3) const;
+
 private:
   static GLuint LoadShaderObject(GLenum type, const std::string &filename);
 
