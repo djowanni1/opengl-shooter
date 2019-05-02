@@ -10,10 +10,10 @@
 #include <random>
 #include <cmath>
 #include <vector>
+#include <algorithm>
 #include <string>
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
+#include <random>
+#include <ctime>
 
 using std::vector;
 using std::string;
@@ -36,6 +36,8 @@ GLfloat deltaTime = 0.0f;
 GLfloat lastFrame = 0.0f;
 
 
+std::mt19937 gen(time(0));
+
 
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode);
 
@@ -46,36 +48,44 @@ void do_movement();
 unsigned int loadCubemap(vector<std::string> faces);
 
 unsigned int load_texture(const char *image_name);
-unsigned int loadTexture(char const * path);
 
+unsigned int loadTexture(char const *path);
 
 
 class SpriteAnimator {
 private:
     int count_frames;
-    float fps;
-    float step;
+
+
     int stride_x, stride_y;
     float scale_x, scale_y;
-    void UpdateStep(){
+
+    void UpdateStep() {
         step += deltaTime * fps;
-        if (step > count_frames){
+        if (step > count_frames) {
             step -= count_frames;
         }
     }
+
 public:
     GLuint texture;
-    SpriteAnimator(const char *path, int stride_x, int stride_y, int count_frames, float fps)
-    : texture(loadTexture(path))
-    , stride_x(stride_x)
-    , stride_y(stride_y)
-    , scale_x(1.0 / stride_x)
-    , scale_y(1.0 / stride_y)
-    , count_frames(count_frames)
-    , fps(fps)
-    , step(0){};
+    float fps;
+    float step;
+    SpriteAnimator(const char *path, int stride_x, int stride_y, int count_frames)
+            : texture(loadTexture(path)), stride_x(stride_x), stride_y(stride_y), scale_x(1.0 / stride_x),
+              scale_y(1.0 / stride_y), count_frames(count_frames), step(0) {
+        std::uniform_real_distribution<> dis(10, 25);
+        fps = dis(gen);
+    }
 
-    float3x3 animation(){
+    SpriteAnimator(const SpriteAnimator &other, bool create)
+            : texture(other.texture), stride_x(other.stride_x), stride_y(other.stride_y), scale_x(other.scale_x),
+              scale_y(other.scale_y), count_frames(other.count_frames), step(0) {
+        std::uniform_real_distribution<> dis(10, 25);
+        fps = dis(gen);
+    }
+
+    float3x3 animation() {
         UpdateStep();
         int off = int(step);
         float arr[] = {
@@ -87,7 +97,36 @@ public:
     }
 };
 
-inline void speed_control(){
+class Enemy {
+private:
+
+public:
+    SpriteAnimator anim;
+    SpriteAnimator explosion;
+    bool is_alive;
+    float3 direction;
+    float3 position;
+
+    Enemy(SpriteAnimator &anim, SpriteAnimator &explosion)
+            : anim(anim, true), explosion(explosion, true), is_alive(true) {
+        std::uniform_real_distribution<float> dis(-10, 10);
+        position = float3(dis(gen), dis(gen), -50.0f + dis(gen));
+        direction = cameraPos - position;
+    };
+
+    float3x3 animate() {
+        GLfloat speed = 0.1f * deltaTime;
+        position += direction * speed;
+        if (is_alive){
+            return anim.animation();
+        } else {
+            return explosion.animation();
+        }
+
+    }
+};
+
+inline void speed_control() {
     GLfloat currentFrame = glfwGetTime();
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
@@ -113,7 +152,6 @@ int main(int argc, char **argv) {
     if (!glfwInit())
         return -1;
 
-    //запрашиваем контекст opengl версии 3.3
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -145,8 +183,6 @@ int main(int argc, char **argv) {
     while (gl_error != GL_NO_ERROR)
         gl_error = glGetError();
 
-    //создание шейдерной программы из двух файлов с исходниками шейдеров
-    //используется класс-обертка ShaderProgram
     std::unordered_map<GLenum, std::string> shaders;
 
     shaders[GL_VERTEX_SHADER] = "vertex.glsl";
@@ -169,47 +205,47 @@ int main(int argc, char **argv) {
     // box VAO
     float vertices[] = {
             // positions          // texture Coords
-            -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-            0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+            -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+            0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
+            0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+            0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+            -0.5f, 0.5f, -0.5f, 0.0f, 1.0f,
+            -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
 
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-            -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+            -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+            0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
+            0.5f, 0.5f, 0.5f, 1.0f, 1.0f,
+            0.5f, 0.5f, 0.5f, 1.0f, 1.0f,
+            -0.5f, 0.5f, 0.5f, 0.0f, 1.0f,
+            -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
 
-            -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+            -0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+            -0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+            -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+            -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+            -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+            -0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
 
-            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+            0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+            0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+            0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+            0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+            0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+            0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
 
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
-            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+            -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+            0.5f, -0.5f, -0.5f, 1.0f, 1.0f,
+            0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
+            0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
+            -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+            -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
 
-            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
+            -0.5f, 0.5f, -0.5f, 0.0f, 1.0f,
+            0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+            0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+            0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+            -0.5f, 0.5f, 0.5f, 0.0f, 0.0f,
+            -0.5f, 0.5f, -0.5f, 0.0f, 1.0f
     };
     GLuint VBO, VAO;
     glGenVertexArrays(1, &VAO);
@@ -224,7 +260,8 @@ int main(int argc, char **argv) {
 
     GLuint textureLocation = 1;
     glEnableVertexAttribArray(textureLocation);
-    glVertexAttribPointer(textureLocation, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (3 * sizeof(GLfloat)));
+    glVertexAttribPointer(textureLocation, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat),
+                          (GLvoid *) (3 * sizeof(GLfloat)));
     glBindVertexArray(0);
 
     // Plane VAO
@@ -251,53 +288,54 @@ int main(int argc, char **argv) {
 
     GLuint planetexLocation = 1;
     glEnableVertexAttribArray(planetexLocation);
-    glVertexAttribPointer(planetexLocation, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (3 * sizeof(GLfloat)));
+    glVertexAttribPointer(planetexLocation, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat),
+                          (GLvoid *) (3 * sizeof(GLfloat)));
     glBindVertexArray(0);
 
     // Sky VAO
     float sky_vertices[] = {
             // positions
-            -1.0f,  1.0f, -1.0f,
+            -1.0f, 1.0f, -1.0f,
             -1.0f, -1.0f, -1.0f,
             1.0f, -1.0f, -1.0f,
             1.0f, -1.0f, -1.0f,
-            1.0f,  1.0f, -1.0f,
-            -1.0f,  1.0f, -1.0f,
+            1.0f, 1.0f, -1.0f,
+            -1.0f, 1.0f, -1.0f,
 
-            -1.0f, -1.0f,  1.0f,
+            -1.0f, -1.0f, 1.0f,
             -1.0f, -1.0f, -1.0f,
-            -1.0f,  1.0f, -1.0f,
-            -1.0f,  1.0f, -1.0f,
-            -1.0f,  1.0f,  1.0f,
-            -1.0f, -1.0f,  1.0f,
+            -1.0f, 1.0f, -1.0f,
+            -1.0f, 1.0f, -1.0f,
+            -1.0f, 1.0f, 1.0f,
+            -1.0f, -1.0f, 1.0f,
 
             1.0f, -1.0f, -1.0f,
-            1.0f, -1.0f,  1.0f,
-            1.0f,  1.0f,  1.0f,
-            1.0f,  1.0f,  1.0f,
-            1.0f,  1.0f, -1.0f,
+            1.0f, -1.0f, 1.0f,
+            1.0f, 1.0f, 1.0f,
+            1.0f, 1.0f, 1.0f,
+            1.0f, 1.0f, -1.0f,
             1.0f, -1.0f, -1.0f,
 
-            -1.0f, -1.0f,  1.0f,
-            -1.0f,  1.0f,  1.0f,
-            1.0f,  1.0f,  1.0f,
-            1.0f,  1.0f,  1.0f,
-            1.0f, -1.0f,  1.0f,
-            -1.0f, -1.0f,  1.0f,
+            -1.0f, -1.0f, 1.0f,
+            -1.0f, 1.0f, 1.0f,
+            1.0f, 1.0f, 1.0f,
+            1.0f, 1.0f, 1.0f,
+            1.0f, -1.0f, 1.0f,
+            -1.0f, -1.0f, 1.0f,
 
-            -1.0f,  1.0f, -1.0f,
-            1.0f,  1.0f, -1.0f,
-            1.0f,  1.0f,  1.0f,
-            1.0f,  1.0f,  1.0f,
-            -1.0f,  1.0f,  1.0f,
-            -1.0f,  1.0f, -1.0f,
+            -1.0f, 1.0f, -1.0f,
+            1.0f, 1.0f, -1.0f,
+            1.0f, 1.0f, 1.0f,
+            1.0f, 1.0f, 1.0f,
+            -1.0f, 1.0f, 1.0f,
+            -1.0f, 1.0f, -1.0f,
 
             -1.0f, -1.0f, -1.0f,
-            -1.0f, -1.0f,  1.0f,
+            -1.0f, -1.0f, 1.0f,
             1.0f, -1.0f, -1.0f,
             1.0f, -1.0f, -1.0f,
-            -1.0f, -1.0f,  1.0f,
-            1.0f, -1.0f,  1.0f
+            -1.0f, -1.0f, 1.0f,
+            1.0f, -1.0f, 1.0f
     };
     GLuint skyVBO, skyVAO;
     glGenVertexArrays(1, &skyVAO);
@@ -314,28 +352,29 @@ int main(int argc, char **argv) {
 
     // Load and create a texture
     GLuint texture1 = loadTexture("../container.jpg");
-    GLuint texture2 = loadTexture("../awesomeface.png");
+    //GLuint texture2 = loadTexture("../awesomeface.png");
 
     objects_shader.StartUseShader();
     objects_shader.SetUniform("Texture", 0);
     objects_shader.StopUseShader();
 
-    SpriteAnimator boom("../boom.png", 9, 9, 81, 25);
-    SpriteAnimator asteroid1("../asteroid1.png", 8, 8, 32, 25);
-    SpriteAnimator asteroid2("../asteroid2.png", 5, 6, 30, 10);
+    SpriteAnimator boom("../boom.png", 9, 9, 81);
+    SpriteAnimator asteroid1("../asteroid1.png", 8, 8, 32);
+    SpriteAnimator asteroid2("../asteroid2.png", 5, 6, 30);
     //SpriteAnimator asteroid3("../asteroid3.png", 5, 6, 25, 15);
 
     sprite_shader.StartUseShader();
     sprite_shader.SetUniform("Texture", 0);
+    sprite_shader.SetUniform("boom", 1);
     sprite_shader.StopUseShader();
 
     vector<std::string> faces{
-            "../bg/right.jpg",
-            "../bg/left.jpg",
-            "../bg/top.jpg",
-            "../bg/bottom.jpg",
-            "../bg/front.jpg",
-            "../bg/back.jpg"
+            "../bg/right_1.jpg",
+            "../bg/left_1.jpg",
+            "../bg/top_1.jpg",
+            "../bg/bottom_1.jpg",
+            "../bg/front_1.jpg",
+            "../bg/back_1.jpg"
     };
     GLuint background_tex = loadCubemap(faces);
 
@@ -343,13 +382,13 @@ int main(int argc, char **argv) {
     sky_shader.SetUniform("skybox", 0);
     sky_shader.StopUseShader();
 
-    std::vector<float3> asteroid_positions = {
-            {0.0, 0.0, -10.0},
-            {0.0, 0.0, -20.0},
-            {0.0, 0.0, -30.0},
-            {0.0, 0.0, -40.0}
+    std::vector<Enemy> asteroids = {
+            Enemy(asteroid1, boom),
+            Enemy(asteroid1, boom),
+            Enemy(asteroid1, boom),
+            Enemy(asteroid1, boom),
     };
-
+    asteroids[0].is_alive = false;
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
@@ -375,7 +414,8 @@ int main(int argc, char **argv) {
         /// unbind VAO -> stop shader
 
         /// sky
-        glDepthMask(GL_FALSE);
+        //glDepthMask(GL_FALSE);
+        glDepthFunc(GL_LEQUAL);
         sky_shader.StartUseShader();
 
         view.row[0].w = 0.0f;
@@ -392,13 +432,42 @@ int main(int argc, char **argv) {
 
         glBindVertexArray(0);
         sky_shader.StopUseShader();
-        glDepthMask(GL_TRUE);
+        glDepthFunc(GL_LESS);
+        //glDepthMask(GL_TRUE);
+
+        view = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));
+
+        /// Sprites
+        sprite_shader.StartUseShader();
+
+        sprite_shader.SetUniform("view", view);
+        sprite_shader.SetUniform("projection", projection);
+
+        glBindVertexArray(planeVAO);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, asteroid1.texture);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, boom.texture);
+        std::sort(asteroids.begin(), asteroids.end(),
+                  [](const Enemy &p1, Enemy &p2) {
+                      return p1.position.z < p2.position.z;
+                  });
+        for (auto &astro : asteroids) {
+            model = translate4x4(astro.position);
+            sprite_shader.SetUniform("model", model);
+            sprite_shader.SetUniform("is_alive", astro.is_alive);
+            sprite_shader.SetUniform("animation", astro.animate());
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
+
+        glBindVertexArray(0);
+        sprite_shader.StopUseShader();
 
 
         /// objects
         objects_shader.StartUseShader();
 
-        view = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));
         objects_shader.SetUniform("view", view);
         objects_shader.SetUniform("projection", projection);
 
@@ -407,65 +476,12 @@ int main(int argc, char **argv) {
 
         glBindVertexArray(VAO);
 
-        model = translate4x4(float3(0.0f, 0.0f, 0.0f));
+        model = translate4x4(float3(10.0f, 0.0f, 0.0f));
         objects_shader.SetUniform("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 36);
 
-//        model = rotate_X_4x4(45.0);
-//        model = mul(translate4x4(float3(10.0f, 10.0f, 0.0f)), model);
-//        objects_shader.SetUniform("model", model);
-//        glDrawArrays(GL_TRIANGLES, 0, 36);
-
         glBindVertexArray(0);
         objects_shader.StopUseShader();
-
-        /// Sprites
-        sprite_shader.StartUseShader();
-
-        sprite_shader.SetUniform("view", view);
-        sprite_shader.SetUniform("projection", projection);
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, boom.texture);
-
-        glBindVertexArray(planeVAO);
-
-        model = translate4x4(float3(0.0f, 0.0f, -5.0f));
-        sprite_shader.SetUniform("model", model);
-        sprite_shader.SetUniform("animation", boom.animation());
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, asteroid1.texture);
-        for (auto position : asteroid_positions){
-            model = translate4x4(position);
-            sprite_shader.SetUniform("model", model);
-            sprite_shader.SetUniform("animation", asteroid1.animation());
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-        }
-//        model = translate4x4(float3(0.0f, -5.0f, -5.0f));
-//        sprite_shader.SetUniform("model", model);
-//        sprite_shader.SetUniform("animation", asteroid1.animation());
-//        glDrawArrays(GL_TRIANGLES, 0, 6);
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, asteroid2.texture);
-
-        model = translate4x4(float3(10.0f, -5.0f, -5.0f));
-        sprite_shader.SetUniform("model", model);
-        sprite_shader.SetUniform("animation", asteroid2.animation());
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-
-//        glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_2D, asteroid3.texture);
-//
-//        model = translate4x4(float3(10.0f, 5.0f, -2.5f));
-//        sprite_shader.SetUniform("model", model);
-//        sprite_shader.SetUniform("animation", asteroid3.animation());
-//        glDrawArrays(GL_TRIANGLES, 0, 6);
-
-        glBindVertexArray(0);
-        sprite_shader.StopUseShader();
 
 
         GL_CHECK_ERRORS;
@@ -568,6 +584,7 @@ unsigned int loadCubemap(vector<std::string> faces) {
             // stbi_image_free(data);
         }
     }
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -577,7 +594,7 @@ unsigned int loadCubemap(vector<std::string> faces) {
     return textureID;
 }
 
-unsigned int load_texture(const char* filename){
+unsigned int load_texture(const char *filename) {
     GLuint texture;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
@@ -598,14 +615,13 @@ unsigned int load_texture(const char* filename){
     return texture;
 }
 
-unsigned int loadTexture(char const * path) {
+unsigned int loadTexture(char const *path) {
     unsigned int textureID;
     glGenTextures(1, &textureID);
 
     int width, height, nrComponents;
     unsigned char *data = SOIL_load_image(path, &width, &height, &nrComponents, 0);
-    if (data)
-    {
+    if (data) {
         GLenum format;
         if (nrComponents == 1)
             format = GL_RED;
@@ -624,9 +640,7 @@ unsigned int loadTexture(char const * path) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         SOIL_free_image_data(data);
-    }
-    else
-    {
+    } else {
         std::cout << "Texture failed to load at path: " << path << std::endl;
         SOIL_free_image_data(data);
     }
