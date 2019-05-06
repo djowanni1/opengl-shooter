@@ -118,3 +118,8 @@ LiteMath::float3x3 Asteroid::animate() {
         return boom.animation();
     }
 }
+
+void Asteroid::kill() {
+    is_alive = false;
+    time_of_death = time(0);
+}

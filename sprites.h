@@ -52,10 +52,7 @@ public:
 class Asteroid : public SpriteAnimator{
 private:
     Explosion boom;
-
     LiteMath::float3 direction;
-
-
     void UpdateStep () override {
         step += deltaTime * fps;
         if (step > count_frames) {
@@ -65,10 +62,13 @@ private:
 
 public:
     bool is_alive;
+    time_t time_of_death = 0;
     LiteMath::float3 position;
     Asteroid(Sprite &astro, Sprite &boom);
 
     LiteMath::float3x3 animate();
+
+    void kill();
 };
 
 #endif //MAIN_SPRITES_H

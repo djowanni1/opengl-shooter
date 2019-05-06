@@ -398,12 +398,16 @@ int main(int argc, char **argv) {
         if (kill){
             destroy_enemies(asteroids, view, projection);
         }
+        time_t current = time(0);
         for (auto &astro : asteroids) {
             model = translate4x4(astro.position);
             sprite_shader.SetUniform("model", model);
             sprite_shader.SetUniform("is_alive", astro.is_alive);
             sprite_shader.SetUniform("animation", astro.animate());
             glDrawArrays(GL_TRIANGLES, 0, 6);
+            if (!astro.is_alive && (current - astro.time_of_death) > 5){
+                astro = Asteroid(asteroid1, explosion1);
+            }
         }
 
         glBindVertexArray(0);
@@ -509,8 +513,6 @@ void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
         glfwGetCursorPos(window, &x, &y);
         cursorPos = normalize_cursor(x, y);
     }
-//    std::cout << "cursor "<< xpos << ' ' << ypos << std::endl;
-//    std::cout << "cursor crop "<< 2 * xpos / WIDTH - 1.0 << ' ' << 2 * (HEIGHT - ypos) / HEIGHT - 1.0 << std::endl;
 }
 
 void destroy_enemies(vector<Asteroid> &asteroids, float4x4 &view, float4x4 &projection){
@@ -522,15 +524,15 @@ void destroy_enemies(vector<Asteroid> &asteroids, float4x4 &view, float4x4 &proj
         t_r = mul(projection, mul(view, t_r));
         t_r /= t_r.w;
         if (hit(b_l, t_r)){
-            astro->is_alive = false;
+            astro->kill();
             break;
         }
-        //std::cout << "position " << astro.position.x << ' ' << astro.position.y << ' ' << astro.position.z << std::endl;
-//        std::cout << "bottom left corner " << b_l.x << ' ' << b_l.y  << ' ' << b_l.z << std::endl;
-//        std::cout << "top right corner " << t_r.x << ' ' << t_r.y  << ' ' << t_r.z << std::endl;
-
     }
     kill = false;
+}
+
+void respawn(vector<Asteroid> &asteroids){
+
 }
 
 inline bool hit(float4 &b_l, float4 &t_r){
