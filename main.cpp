@@ -2,6 +2,7 @@
 #include "common.h"
 #include "ShaderProgram.h"
 #include "LiteMath.h"
+#include "sprites.h"
 //External dependencies
 #define GLFW_DLL
 
@@ -32,99 +33,28 @@ float3 cameraUp = normalize(float3(0.0f, 1.0f, 0.0f));
 
 bool keys[1024];
 
-GLfloat deltaTime = 0.0f;
-GLfloat lastFrame = 0.0f;
+float deltaTime = 0.0f;
+float lastFrame = 0.0f;
 
 
-std::mt19937 gen(time(0));
+//std::mt19937 gen(time(0));
+
+bool kill = false;
 
 
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode);
 
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
+void mouse_button_callback(GLFWwindow *window, int button, int action, int mods);
 
 void do_movement();
 
 unsigned int loadCubemap(vector<std::string> faces);
 
-unsigned int load_texture(const char *image_name);
-
 unsigned int loadTexture(char const *path);
 
 
-class SpriteAnimator {
-private:
-    int count_frames;
 
-
-    int stride_x, stride_y;
-    float scale_x, scale_y;
-
-    void UpdateStep() {
-        step += deltaTime * fps;
-        if (step > count_frames) {
-            step -= count_frames;
-        }
-    }
-
-public:
-    GLuint texture;
-    float fps;
-    float step;
-    SpriteAnimator(const char *path, int stride_x, int stride_y, int count_frames)
-            : texture(loadTexture(path)), stride_x(stride_x), stride_y(stride_y), scale_x(1.0 / stride_x),
-              scale_y(1.0 / stride_y), count_frames(count_frames), step(0) {
-        std::uniform_real_distribution<> dis(10, 25);
-        fps = dis(gen);
-    }
-
-    SpriteAnimator(const SpriteAnimator &other, bool create)
-            : texture(other.texture), stride_x(other.stride_x), stride_y(other.stride_y), scale_x(other.scale_x),
-              scale_y(other.scale_y), count_frames(other.count_frames), step(0) {
-        std::uniform_real_distribution<> dis(10, 25);
-        fps = dis(gen);
-    }
-
-    float3x3 animation() {
-        UpdateStep();
-        int off = int(step);
-        float arr[] = {
-                scale_x, 0.0, off % stride_x * scale_x,
-                0.0, scale_y, off / stride_y * scale_y,
-                0.0, 0.0, 1.0
-        };
-        return float3x3(arr);
-    }
-};
-
-class Enemy {
-private:
-
-public:
-    SpriteAnimator anim;
-    SpriteAnimator explosion;
-    bool is_alive;
-    float3 direction;
-    float3 position;
-
-    Enemy(SpriteAnimator &anim, SpriteAnimator &explosion)
-            : anim(anim, true), explosion(explosion, true), is_alive(true) {
-        std::uniform_real_distribution<float> dis(-10, 10);
-        position = float3(dis(gen), dis(gen), -50.0f + dis(gen));
-        direction = cameraPos - position;
-    };
-
-    float3x3 animate() {
-        GLfloat speed = 0.1f * deltaTime;
-        position += direction * speed;
-        if (is_alive){
-            return anim.animation();
-        } else {
-            return explosion.animation();
-        }
-
-    }
-};
 
 inline void speed_control() {
     GLfloat currentFrame = glfwGetTime();
@@ -134,7 +64,6 @@ inline void speed_control() {
 
 int initGL() {
     int res = 0;
-    //грузим функции opengl через glad
     if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
         std::cout << "Failed to initialize OpenGL context" << std::endl;
         return -1;
@@ -165,9 +94,10 @@ int main(int argc, char **argv) {
     }
 
     glfwMakeContextCurrent(window);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     glfwSetKeyCallback(window, key_callback);
-    glfwSetCursorPosCallback(window, mouse_callback);
+    //glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
 
     if (initGL() != 0)
         return -1;
@@ -352,16 +282,13 @@ int main(int argc, char **argv) {
 
     // Load and create a texture
     GLuint texture1 = loadTexture("../container.jpg");
-    //GLuint texture2 = loadTexture("../awesomeface.png");
 
     objects_shader.StartUseShader();
     objects_shader.SetUniform("Texture", 0);
     objects_shader.StopUseShader();
 
-    SpriteAnimator boom("../boom.png", 9, 9, 81);
-    SpriteAnimator asteroid1("../asteroid1.png", 8, 8, 32);
-    SpriteAnimator asteroid2("../asteroid2.png", 5, 6, 30);
-    //SpriteAnimator asteroid3("../asteroid3.png", 5, 6, 25, 15);
+    Sprite explosion1(loadTexture("../boom.png"), 9, 9, 81);
+    Sprite asteroid1(loadTexture("../asteroid1.png"), 8, 8, 32);
 
     sprite_shader.StartUseShader();
     sprite_shader.SetUniform("Texture", 0);
@@ -382,16 +309,18 @@ int main(int argc, char **argv) {
     sky_shader.SetUniform("skybox", 0);
     sky_shader.StopUseShader();
 
-    std::vector<Enemy> asteroids = {
-            Enemy(asteroid1, boom),
-            Enemy(asteroid1, boom),
-            Enemy(asteroid1, boom),
-            Enemy(asteroid1, boom),
+    std::vector<Asteroid> asteroids = {
+            Asteroid(asteroid1, explosion1),
+            Asteroid(asteroid1, explosion1),
+            Asteroid(asteroid1, explosion1),
+            Asteroid(asteroid1, explosion1),
     };
-    asteroids[0].is_alive = false;
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
-
+        if (kill){
+            asteroids[0].is_alive = false;
+        }
         // Camera movements
         speed_control();
         do_movement();
@@ -448,9 +377,9 @@ int main(int argc, char **argv) {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, asteroid1.texture);
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, boom.texture);
+        glBindTexture(GL_TEXTURE_2D, explosion1.texture);
         std::sort(asteroids.begin(), asteroids.end(),
-                  [](const Enemy &p1, Enemy &p2) {
+                  [](const Asteroid &p1, Asteroid &p2) {
                       return p1.position.z < p2.position.z;
                   });
         for (auto &astro : asteroids) {
@@ -550,16 +479,15 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
     yaw += xoffset;
     pitch += yoffset;
 
-//    if(pitch > M_PI_2)
-//        pitch = M_PI_2;
-//    if(pitch < -M_PI_2)
-//        pitch = -M_PI_2;
-
     float3 front;
     front.x = cos(yaw) * cos(pitch);
     front.y = sin(pitch);
     front.z = sin(yaw) * cos(pitch);
     cameraFront = normalize(front);
+}
+
+void mouse_button_callback(GLFWwindow *window, int button, int action, int mods){
+    kill=true;
 }
 
 unsigned int loadCubemap(vector<std::string> faces) {
@@ -571,17 +499,14 @@ unsigned int loadCubemap(vector<std::string> faces) {
     for (unsigned int i = 0; i < faces.size(); i++) {
         unsigned char *data = SOIL_load_image(faces[i].c_str(), &width, &height, &nrChannels, 0);
         std::cout << SOIL_last_result() << std::endl;
-        //stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
         if (data) {
             glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
                          0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data
             );
             SOIL_free_image_data(data);
-            //stbi_image_free(data);
         } else {
             std::cout << "Cubemap texture failed to load at path: " << faces[i] << std::endl;
             SOIL_free_image_data(data);
-            // stbi_image_free(data);
         }
     }
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
@@ -592,27 +517,6 @@ unsigned int loadCubemap(vector<std::string> faces) {
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
     return textureID;
-}
-
-unsigned int load_texture(const char *filename) {
-    GLuint texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    // Set our texture parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    // Set texture filtering
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // Load, create texture and generate mipmaps
-    int width, height;
-    unsigned char *image = SOIL_load_image(filename, &width, &height, 0, SOIL_LOAD_RGB);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
-    glGenerateMipmap(GL_TEXTURE_2D);
-    SOIL_free_image_data(image);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    GL_CHECK_ERRORS;
-    return texture;
 }
 
 unsigned int loadTexture(char const *path) {
