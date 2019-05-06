@@ -100,7 +100,7 @@ SpriteAnimator::SpriteAnimator(Sprite &init)
 }
 
 Explosion::Explosion(Sprite &init) : SpriteAnimator(init) {
-    fps = 25.0;
+    fps = 35.0;
 }
 
 

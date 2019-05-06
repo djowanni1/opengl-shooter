@@ -49,6 +49,13 @@ void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
 
 void do_movement();
 
+float2 cursorPos;
+
+void destroy_enemies(vector<Asteroid> &asteroids, float4x4 &view, float4x4 &projection);
+
+inline bool hit(float4 &b_l, float4 &t_r);
+inline float2 normalize_cursor(double x, double y);
+
 unsigned int loadCubemap(vector<std::string> faces);
 
 unsigned int loadTexture(char const *path);
@@ -99,6 +106,10 @@ int main(int argc, char **argv) {
     //glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetMouseButtonCallback(window, mouse_button_callback);
 
+    //SOIL_load_image(faces[i].c_str(), &width, &height, &nrChannels, 0);
+    GLFWimage cursor;
+    cursor.pixels = SOIL_load_image("../cursor.png", &cursor.width, &cursor.height, 0, 0);
+    glfwSetCursor(window, glfwCreateCursor(&cursor, 10, 10));
     if (initGL() != 0)
         return -1;
 
@@ -315,12 +326,9 @@ int main(int argc, char **argv) {
             Asteroid(asteroid1, explosion1),
             Asteroid(asteroid1, explosion1),
     };
-
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
-        if (kill){
-            asteroids[0].is_alive = false;
-        }
+
         // Camera movements
         speed_control();
         do_movement();
@@ -333,6 +341,11 @@ int main(int argc, char **argv) {
 
         float4x4 projection = transpose(
                 projectionMatrixTransposed(45.0f, (GLfloat) WIDTH / (GLfloat) HEIGHT, 0.1f, 100.0f));
+
+        if (kill){
+            //asteroids[0].is_alive = false;
+
+        }
 
         float4x4 model;
         /// Start shader ->
@@ -382,6 +395,9 @@ int main(int argc, char **argv) {
                   [](const Asteroid &p1, Asteroid &p2) {
                       return p1.position.z < p2.position.z;
                   });
+        if (kill){
+            destroy_enemies(asteroids, view, projection);
+        }
         for (auto &astro : asteroids) {
             model = translate4x4(astro.position);
             sprite_shader.SetUniform("model", model);
@@ -487,8 +503,44 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
 }
 
 void mouse_button_callback(GLFWwindow *window, int button, int action, int mods){
-    kill=true;
+    if (button == GLFW_MOUSE_BUTTON_2 && action == GLFW_PRESS){
+        kill = true;
+        double x, y;
+        glfwGetCursorPos(window, &x, &y);
+        cursorPos = normalize_cursor(x, y);
+    }
+//    std::cout << "cursor "<< xpos << ' ' << ypos << std::endl;
+//    std::cout << "cursor crop "<< 2 * xpos / WIDTH - 1.0 << ' ' << 2 * (HEIGHT - ypos) / HEIGHT - 1.0 << std::endl;
 }
+
+void destroy_enemies(vector<Asteroid> &asteroids, float4x4 &view, float4x4 &projection){
+    for (auto astro = asteroids.rbegin(); astro != asteroids.rend(); ++astro){
+        auto b_l = float4(astro->position + float3(-0.5, -0.5, 0.0));
+        b_l = mul(projection, mul(view, b_l));
+        b_l /= b_l.w;
+        auto t_r = float4(astro->position + float3(0.5, 0.5, 0.0));
+        t_r = mul(projection, mul(view, t_r));
+        t_r /= t_r.w;
+        if (hit(b_l, t_r)){
+            astro->is_alive = false;
+            break;
+        }
+        //std::cout << "position " << astro.position.x << ' ' << astro.position.y << ' ' << astro.position.z << std::endl;
+//        std::cout << "bottom left corner " << b_l.x << ' ' << b_l.y  << ' ' << b_l.z << std::endl;
+//        std::cout << "top right corner " << t_r.x << ' ' << t_r.y  << ' ' << t_r.z << std::endl;
+
+    }
+    kill = false;
+}
+
+inline bool hit(float4 &b_l, float4 &t_r){
+    return b_l.x <= cursorPos.x && b_l.y <= cursorPos.y && cursorPos.x <= t_r.x && cursorPos.y <= t_r.y;
+}
+
+inline float2 normalize_cursor(double x, double y){
+    return float2(2 * x / WIDTH - 1.0, 2 * (HEIGHT - y) / HEIGHT - 1.0);
+}
+
 
 unsigned int loadCubemap(vector<std::string> faces) {
     unsigned int textureID;

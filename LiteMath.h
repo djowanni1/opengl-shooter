@@ -38,6 +38,8 @@ namespace LiteMath {
 
         float4(float a, float b, float c, float d) : x(a), y(b), z(c), w(d) {}
 
+        float4(float3 vec): x(vec.x), y(vec.y), z(vec.z), w(1){}
+
         float x, y, z, w;
     };
 
