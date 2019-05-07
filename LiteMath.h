@@ -600,6 +600,7 @@ namespace LiteMath {
     }
 
 
+
     static inline float4x4 make_float4x4_by_columns(float4 a, float4 b, float4 c, float4 d) {
         float4x4 m;
 

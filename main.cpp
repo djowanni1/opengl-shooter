@@ -290,29 +290,53 @@ int main(int argc, char **argv) {
     glVertexAttribPointer(skyLocation, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid *) (0));
     glBindVertexArray(0);
 
+    // Trash VAO
+    float trash_vectices[] = {
+            0.0f, 0.0f, 0.0f
+    };
+    GLuint trashVBO, trashVAO;
+    glGenVertexArrays(1, &trashVAO);
+    glGenBuffers(1, &trashVBO);
+    glBindVertexArray(trashVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, trashVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(sky_vertices), sky_vertices, GL_STATIC_DRAW);
+
+    GLuint trashLocation = 0;
+    glEnableVertexAttribArray(trashLocation);
+    glVertexAttribPointer(trashLocation, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid *) (0));
+    glBindVertexArray(0);
+
 
     // Load and create a texture
-    GLuint texture1 = loadTexture("../container.jpg");
-
+    GLuint texture1 = loadTexture("../cockpit.png");
     objects_shader.StartUseShader();
     objects_shader.SetUniform("Texture", 0);
     objects_shader.StopUseShader();
 
     Sprite explosion1(loadTexture("../boom.png"), 9, 9, 81);
     Sprite asteroid1(loadTexture("../asteroid1.png"), 8, 8, 32);
-
+    Sprite asteroid2(loadTexture("../asteroid2.png"), 5, 6, 30);
+    Sprite trash(loadTexture("../trash.png"), 1, 1, 1);
     sprite_shader.StartUseShader();
     sprite_shader.SetUniform("Texture", 0);
     sprite_shader.SetUniform("boom", 1);
     sprite_shader.StopUseShader();
 
-    vector<std::string> faces{
-            "../bg/right_1.jpg",
-            "../bg/left_1.jpg",
-            "../bg/top_1.jpg",
-            "../bg/bottom_1.jpg",
-            "../bg/front_1.jpg",
-            "../bg/back_1.jpg"
+//    vector<std::string> faces{
+//            "../bg/right_mw.jpg",
+//            "../bg/left_mw.jpg",
+//            "../bg/top_mw.jpg",
+//            "../bg/bottom_mw.jpg",
+//            "../bg/front_mw.jpg",
+//            "../bg/back_mw.jpg"
+//    };
+    vector <std::string> faces{
+        "../bg/background.jpg",
+        "../bg/background.jpg",
+        "../bg/background.jpg",
+        "../bg/background.jpg",
+        "../bg/background.jpg",
+        "../bg/background.jpg"
     };
     GLuint background_tex = loadCubemap(faces);
 
@@ -323,9 +347,17 @@ int main(int argc, char **argv) {
     std::vector<Asteroid> asteroids = {
             Asteroid(asteroid1, explosion1),
             Asteroid(asteroid1, explosion1),
-            Asteroid(asteroid1, explosion1),
-            Asteroid(asteroid1, explosion1),
+            Asteroid(asteroid2, explosion1),
+            Asteroid(asteroid2, explosion1),
     };
+//    std::vector<Asteroid> trashes = {
+//            Asteroid(trash, explosion1),
+//            Asteroid(trash, explosion1),
+//            Asteroid(trash, explosion1),
+//            Asteroid(trash, explosion1),
+//    };
+
+    std::uniform_int_distribution<> dis(1,2);
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
@@ -387,8 +419,6 @@ int main(int argc, char **argv) {
 
         glBindVertexArray(planeVAO);
 
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, asteroid1.texture);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, explosion1.texture);
         std::sort(asteroids.begin(), asteroids.end(),
@@ -400,15 +430,29 @@ int main(int argc, char **argv) {
         }
         time_t current = time(0);
         for (auto &astro : asteroids) {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, astro.texture);
             model = translate4x4(astro.position);
             sprite_shader.SetUniform("model", model);
             sprite_shader.SetUniform("is_alive", astro.is_alive);
             sprite_shader.SetUniform("animation", astro.animate());
             glDrawArrays(GL_TRIANGLES, 0, 6);
             if (!astro.is_alive && (current - astro.time_of_death) > 5){
-                astro = Asteroid(asteroid1, explosion1);
+                astro.respawn();
             }
         }
+//        glActiveTexture(GL_TEXTURE0);
+//        glBindTexture(GL_TEXTURE_2D, trash.texture);
+//        for (auto &tra : trashes) {
+//            model = scale4x4(float3(0.1, 0.1, 0.1));
+//            model.row[0].w = tra.position.x;
+//            model.row[1].w = tra.position.y;
+//            model.row[2].w = tra.position.z;
+//            sprite_shader.SetUniform("model", model);
+//            sprite_shader.SetUniform("is_alive", tra.is_alive);
+//            sprite_shader.SetUniform("animation", tra.animate());
+//            glDrawArrays(GL_TRIANGLES, 0, 6);
+//        }
 
         glBindVertexArray(0);
         sprite_shader.StopUseShader();
@@ -423,13 +467,18 @@ int main(int argc, char **argv) {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture1);
 
-        glBindVertexArray(VAO);
-
-        model = translate4x4(float3(10.0f, 0.0f, 0.0f));
+        glBindVertexArray(planeVAO);
+        model = translate4x4(cameraPos + float3(0.0f, -0.0f, -1.1f));
         objects_shader.SetUniform("model", model);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-
+        glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
+//        glBindVertexArray(VAO);
+//
+//        model = translate4x4(float3(10.0f, 0.0f, 0.0f));
+//        objects_shader.SetUniform("model", model);
+//        glDrawArrays(GL_TRIANGLES, 0, 36);
+//
+//        glBindVertexArray(0);
         objects_shader.StopUseShader();
 
 
@@ -517,22 +566,20 @@ void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
 
 void destroy_enemies(vector<Asteroid> &asteroids, float4x4 &view, float4x4 &projection){
     for (auto astro = asteroids.rbegin(); astro != asteroids.rend(); ++astro){
-        auto b_l = float4(astro->position + float3(-0.5, -0.5, 0.0));
-        b_l = mul(projection, mul(view, b_l));
-        b_l /= b_l.w;
-        auto t_r = float4(astro->position + float3(0.5, 0.5, 0.0));
-        t_r = mul(projection, mul(view, t_r));
-        t_r /= t_r.w;
-        if (hit(b_l, t_r)){
-            astro->kill();
-            break;
+        if (astro->is_alive){
+            auto b_l = float4(astro->position + float3(-0.5, -0.5, 0.0));
+            b_l = mul(projection, mul(view, b_l));
+            b_l /= b_l.w;
+            auto t_r = float4(astro->position + float3(0.5, 0.5, 0.0));
+            t_r = mul(projection, mul(view, t_r));
+            t_r /= t_r.w;
+            if (hit(b_l, t_r)){
+                astro->kill();
+                break;
+            }
         }
     }
     kill = false;
-}
-
-void respawn(vector<Asteroid> &asteroids){
-
 }
 
 inline bool hit(float4 &b_l, float4 &t_r){
@@ -542,7 +589,6 @@ inline bool hit(float4 &b_l, float4 &t_r){
 inline float2 normalize_cursor(double x, double y){
     return float2(2 * x / WIDTH - 1.0, 2 * (HEIGHT - y) / HEIGHT - 1.0);
 }
-
 
 unsigned int loadCubemap(vector<std::string> faces) {
     unsigned int textureID;

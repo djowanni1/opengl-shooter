@@ -31,7 +31,7 @@ public:
         int off = int(step);
         float arr[] = {
                 scale_x, 0.0, off % stride_x * scale_x,
-                0.0, scale_y, off / stride_y * scale_y,
+                0.0, scale_y, off / stride_x * scale_y,
                 0.0, 0.0, 1.0
         };
         return LiteMath::float3x3(arr);
@@ -47,6 +47,7 @@ class Explosion : public SpriteAnimator{
     }
 public:
     explicit Explosion(Sprite &init);
+    void new_boom();
 };
 
 class Asteroid : public SpriteAnimator{
@@ -64,11 +65,13 @@ public:
     bool is_alive;
     time_t time_of_death = 0;
     LiteMath::float3 position;
+
     Asteroid(Sprite &astro, Sprite &boom);
 
     LiteMath::float3x3 animate();
 
     void kill();
+    void respawn();
 };
 
 #endif //MAIN_SPRITES_H
