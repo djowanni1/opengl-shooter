@@ -37,7 +37,7 @@ float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
 
-//std::mt19937 gen(time(0));
+std::mt19937 gen(time(0));
 
 bool kill = false;
 
@@ -60,7 +60,7 @@ unsigned int loadCubemap(vector<std::string> faces);
 
 unsigned int loadTexture(char const *path);
 
-
+void update_trash(vector<float3> &trash);
 
 
 inline void speed_control() {
@@ -137,6 +137,11 @@ int main(int argc, char **argv) {
     shaders[GL_VERTEX_SHADER] = "sprite_vs.glsl";
     shaders[GL_FRAGMENT_SHADER] = "sprite_fs.glsl";
     ShaderProgram sprite_shader(shaders);
+
+    shaders[GL_VERTEX_SHADER] = "trash_vs.glsl";
+    shaders[GL_GEOMETRY_SHADER] = "trash_gs.glsl";
+    shaders[GL_FRAGMENT_SHADER] = "trash_fs.glsl";
+    ShaderProgram trash_shader(shaders);
     GL_CHECK_ERRORS;
 
     glfwSwapInterval(1); // force 60 frames per second
@@ -316,7 +321,7 @@ int main(int argc, char **argv) {
     Sprite explosion1(loadTexture("../boom.png"), 9, 9, 81);
     Sprite asteroid1(loadTexture("../asteroid1.png"), 8, 8, 32);
     Sprite asteroid2(loadTexture("../asteroid2.png"), 5, 6, 30);
-    Sprite trash(loadTexture("../trash.png"), 1, 1, 1);
+    //Sprite trash(loadTexture("../trash.png"), 1, 1, 1);
     sprite_shader.StartUseShader();
     sprite_shader.SetUniform("Texture", 0);
     sprite_shader.SetUniform("boom", 1);
@@ -356,8 +361,28 @@ int main(int argc, char **argv) {
 //            Asteroid(trash, explosion1),
 //            Asteroid(trash, explosion1),
 //    };
-
-    std::uniform_int_distribution<> dis(1,2);
+//    std::vector<float3> trash_points = {
+//            float3(2.0, 2.0, -60.0),
+//            float3(-1.0, -1.0, -50.0),
+//            float3(-1.0, 1.0, -40.0),
+//            float3(-2.0, -2.0, -30.0),
+//            float3(3.0, -1.0, -70.0),
+//            float3(-3.0, -4.0, -35.0),
+//            float3(-4.5, 2.0, -40.0),
+//            float3(2.0, 3.0, -45.0),
+//            float3(-1.5, -2.0, -50.0),
+//            float3(-2.5, 2.0, -55.0),
+//
+//    };
+    std::vector<float3> trash_points;
+    std::vector<float> points{-10.0, -7.0, -5.0, -2.0, -1.0, 1.0, 2.0, 5.0, 7.0, 10.0};
+    std::normal_distribution<> dis(-40.0, -70.0);
+    for (const auto &i : points){
+        for (const auto &j : points){
+            trash_points.emplace_back(i, j, dis(gen));
+        }
+    }
+    //std::uniform_int_distribution<> dis(1,2);
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
@@ -456,6 +481,24 @@ int main(int argc, char **argv) {
 
         glBindVertexArray(0);
         sprite_shader.StopUseShader();
+
+
+        /// trash
+        trash_shader.StartUseShader();
+
+        trash_shader.SetUniform("view", view);
+        trash_shader.SetUniform("projection", projection);
+
+        glBindVertexArray(trashVAO);
+        for (auto &trash : trash_points){
+            model = translate4x4(trash);
+            trash_shader.SetUniform("model", model);
+            glDrawArrays(GL_POINTS, 0, 1);
+        }
+        update_trash(trash_points);
+
+
+        glBindVertexArray(0);
 
 
         /// objects
@@ -588,6 +631,16 @@ inline bool hit(float4 &b_l, float4 &t_r){
 
 inline float2 normalize_cursor(double x, double y){
     return float2(2 * x / WIDTH - 1.0, 2 * (HEIGHT - y) / HEIGHT - 1.0);
+}
+
+void update_trash(vector<float3> &trash){
+    float3 direction(0.0, 0.0, 1.0);
+    for (auto &coord : trash){
+        coord += direction * 50 * deltaTime;
+        if (coord.z > 0){
+            coord.z -= 70;
+        }
+    }
 }
 
 unsigned int loadCubemap(vector<std::string> faces) {

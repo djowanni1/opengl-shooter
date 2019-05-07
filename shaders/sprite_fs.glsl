@@ -14,8 +14,4 @@ void main() {
     } else {
         color = texture(boom, (animation * vec3(TexCoord.x, TexCoord.y, 1.0)).xy);
     }
-//    if (color.w == 0.0){
-//        color = vec4(1.0);
-//    }
-    //color = vs_color;
 }

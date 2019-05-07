@@ -2,7 +2,7 @@
 #include <ctime>
 #include <random>
 
-std::mt19937 gen(time(0));
+extern std::mt19937 gen;
 
 extern LiteMath::float3 cameraPos;
 
@@ -26,12 +26,12 @@ void Explosion::new_boom() {
 Asteroid::Asteroid(Sprite &astro, Sprite &boom) : SpriteAnimator(astro), boom(boom), is_alive(true) {
     std::uniform_real_distribution<float> dis(-5, 5);
     position = LiteMath::float3(dis(gen), dis(gen), -100.0f + dis(gen));
-    direction = cameraPos - position;
+    direction = normalize(cameraPos - position);
 }
 
 LiteMath::float3x3 Asteroid::animate() {
     if (is_alive) {
-        position += direction * 0.1f * deltaTime;
+        position += direction * 10 * deltaTime;
         return animation();
     } else {
         return boom.animation();
@@ -47,6 +47,6 @@ void Asteroid::respawn() {
     is_alive = true;
     std::uniform_real_distribution<float> dis(-5, 5);
     position = LiteMath::float3(dis(gen), dis(gen), -100.0f + dis(gen));
-    direction = cameraPos - position;
+    direction = normalize(cameraPos - position);
     boom.new_boom();
 }
