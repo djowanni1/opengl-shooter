@@ -79,7 +79,7 @@ public:
     bool actual;
     LiteMath::float3 position;
     LiteMath::float3 direction;
-    explicit Bullet(LiteMath::float3 &enemypos);
+    explicit Bullet(LiteMath::float3 enemypos);
     void move();
 };
 

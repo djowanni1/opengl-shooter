@@ -45,6 +45,10 @@ std::mt19937 gen(time(0));
 
 bool shoot = false;
 list<Bullet> temp_bullets;
+float4x4 projection;
+float4x4 proj_inv;
+float4x4 view;
+float4x4 view_inv;
 
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
@@ -56,7 +60,7 @@ inline void speed_control() {
     lastFrame = currentFrame;
 }
 
-void destroy_enemies(vector<Asteroid> &asteroids, float4x4 &view, float4x4 &projection);
+void destroy_enemies(vector<Asteroid> &asteroids);
 void update_trash(vector<float3> &trash);
 void update_bullets(list<Bullet> &bullets){
 
@@ -73,7 +77,6 @@ unsigned int loadCubemap(vector<std::string> faces);
 unsigned int loadTexture(char const *path);
 
 int initGL() {
-    int res = 0;
     if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
         std::cout << "Failed to initialize OpenGL context" << std::endl;
         return -1;
@@ -314,34 +317,48 @@ int main(int argc, char **argv) {
     glBindVertexArray(0);
 
 
-    // Load and create a texture
+    /// Load and create a texture
     GLuint texture1 = loadTexture("../cockpit.png");
-    objects_shader.StartUseShader();
-    objects_shader.SetUniform("Texture", 0);
-    objects_shader.StopUseShader();
 
     Sprite explosion1(loadTexture("../boom.png"), 9, 9, 81);
     Sprite asteroid1(loadTexture("../asteroid1.png"), 8, 8, 32);
     Sprite asteroid2(loadTexture("../asteroid2.png"), 5, 6, 30);
-    //Sprite trash(loadTexture("../trash.png"), 1, 1, 1);
+
+    vector <std::string> faces{
+            "../bg/background.jpg",
+            "../bg/background.jpg",
+            "../bg/background.jpg",
+            "../bg/background.jpg",
+            "../bg/background.jpg",
+            "../bg/background.jpg"
+    };
+    GLuint background_tex = loadCubemap(faces);
+
+    /// Presetting uniforms
+    projection = transpose(
+            projectionMatrixTransposed(45.0f, (GLfloat) WIDTH / (GLfloat) HEIGHT, 0.1f, 100.0f));
+    proj_inv = inverse4x4(projection);
+
+
+    objects_shader.StartUseShader();
+    objects_shader.SetUniform("projection", projection);
+    objects_shader.SetUniform("Texture", 0);
+    objects_shader.StopUseShader();
+
     sprite_shader.StartUseShader();
+    sprite_shader.SetUniform("projection", projection);
     sprite_shader.SetUniform("Texture", 0);
     sprite_shader.SetUniform("boom", 1);
     sprite_shader.StopUseShader();
 
-    vector <std::string> faces{
-        "../bg/background.jpg",
-        "../bg/background.jpg",
-        "../bg/background.jpg",
-        "../bg/background.jpg",
-        "../bg/background.jpg",
-        "../bg/background.jpg"
-    };
-    GLuint background_tex = loadCubemap(faces);
-
     sky_shader.StartUseShader();
+    sky_shader.SetUniform("projection", projection);
     sky_shader.SetUniform("skybox", 0);
     sky_shader.StopUseShader();
+
+    lines_shader.StartUseShader();
+    lines_shader.SetUniform("projection", projection);
+    lines_shader.StopUseShader();
 
     std::vector<Asteroid> asteroids = {
             Asteroid(asteroid1, explosion1),
@@ -360,6 +377,10 @@ int main(int argc, char **argv) {
             }
         }
     }
+
+
+
+    float4x4 model;
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
@@ -371,12 +392,8 @@ int main(int argc, char **argv) {
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-        float4x4 view = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));
-
-        float4x4 projection = transpose(
-                projectionMatrixTransposed(45.0f, (GLfloat) WIDTH / (GLfloat) HEIGHT, 0.1f, 100.0f));
-
-        float4x4 model;
+        view = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));
+        view_inv = inverse4x4(view);
         /// Start shader ->
         /// set view and projection matrix ->
         /// activate texture ->
@@ -393,7 +410,7 @@ int main(int argc, char **argv) {
         view.row[1].w = 0.0f;
         view.row[2].w = 0.0f;
         sky_shader.SetUniform("view", view);
-        sky_shader.SetUniform("projection", projection);
+
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, background_tex);
@@ -412,7 +429,7 @@ int main(int argc, char **argv) {
         sprite_shader.StartUseShader();
 
         sprite_shader.SetUniform("view", view);
-        sprite_shader.SetUniform("projection", projection);
+
 
         glBindVertexArray(planeVAO);
 
@@ -423,7 +440,7 @@ int main(int argc, char **argv) {
                       return p1.position.z < p2.position.z;
                   });
         if (shoot){
-            destroy_enemies(asteroids, view, projection);
+            destroy_enemies(asteroids);
         }
         time_t current = time(0);
         for (auto &astro : asteroids) {
@@ -446,8 +463,6 @@ int main(int argc, char **argv) {
         lines_shader.StartUseShader();
 
         lines_shader.SetUniform("view", view);
-        lines_shader.SetUniform("projection", projection);
-
         glBindVertexArray(trashVAO);
         GL_CHECK_ERRORS;
 
@@ -488,7 +503,7 @@ int main(int argc, char **argv) {
         objects_shader.StartUseShader();
 
         objects_shader.SetUniform("view", view);
-        objects_shader.SetUniform("projection", projection);
+
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture1);
@@ -580,12 +595,14 @@ void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
         double x, y;
         glfwGetCursorPos(window, &x, &y);
         cursorPos = normalize_cursor(x, y);
-        float3 point(cursorPos.x * 25, cursorPos.y * 25, -50.0);
-        temp_bullets.emplace_back(Bullet(point));
+        float4 mda = mul(proj_inv, float4(cursorPos.x, cursorPos.y, 1.0, 1.0));
+        mda = mul(view_inv, mda);
+        mda /= mda.w;
+        temp_bullets.emplace_back(Bullet(float3(mda.x, mda.y, mda.z)));
     }
 }
 
-void destroy_enemies(vector<Asteroid> &asteroids, float4x4 &view, float4x4 &projection){
+void destroy_enemies(vector<Asteroid> &asteroids){
     for (auto astro = asteroids.rbegin(); astro != asteroids.rend(); ++astro){
         if (astro->is_alive){
             auto b_l = float4(astro->position + float3(-0.5, -0.5, 0.0));
@@ -595,7 +612,6 @@ void destroy_enemies(vector<Asteroid> &asteroids, float4x4 &view, float4x4 &proj
             t_r = mul(projection, mul(view, t_r));
             t_r /= t_r.w;
             if (hit(b_l, t_r)){
-                temp_bullets.emplace_back(Bullet(astro->position));
                 astro->kill();
                 break;
             }
@@ -603,6 +619,7 @@ void destroy_enemies(vector<Asteroid> &asteroids, float4x4 &view, float4x4 &proj
     }
     shoot = false;
 }
+
 void update_trash(vector<float3> &trash){
     float3 direction(0.0, 0.0, 1.0);
     for (auto &coord : trash){

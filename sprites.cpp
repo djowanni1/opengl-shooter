@@ -54,13 +54,13 @@ void Asteroid::respawn() {
     boom.new_boom();
 }
 
-Bullet::Bullet(LiteMath::float3 &enemypos) : actual(true) {
+Bullet::Bullet(LiteMath::float3 enemypos) : actual(true) {
     position = cameraPos + LiteMath::float3(0.0, -1.0, -1.0);
     direction = normalize(enemypos - position) * 10;
 }
 
 void Bullet::move() {
-    position += direction * 50 * deltaTime;
+    position += direction * 25 * deltaTime;
     if (position.z < -100){
         actual = false;
     }
