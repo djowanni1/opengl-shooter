@@ -74,4 +74,13 @@ public:
     void respawn();
 };
 
+class Bullet{
+public:
+    bool actual;
+    LiteMath::float3 position;
+    LiteMath::float3 direction;
+    explicit Bullet(LiteMath::float3 &enemypos);
+    void move();
+};
+
 #endif //MAIN_SPRITES_H

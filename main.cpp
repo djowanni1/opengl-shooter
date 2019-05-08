@@ -15,9 +15,11 @@
 #include <string>
 #include <random>
 #include <ctime>
+#include <list>
 
 using std::vector;
 using std::string;
+using std::list;
 using namespace LiteMath;
 static const GLsizei WIDTH = 640, HEIGHT = 640; //размеры окна
 
@@ -31,6 +33,8 @@ float3 cameraPos = float3(0.0f, 0.0f, 3.0f);
 float3 cameraFront = normalize(float3(0.0f, 0.0f, -1.0f));
 float3 cameraUp = normalize(float3(0.0f, 1.0f, 0.0f));
 
+float2 cursorPos;
+
 bool keys[1024];
 
 float deltaTime = 0.0f;
@@ -39,35 +43,34 @@ float lastFrame = 0.0f;
 
 std::mt19937 gen(time(0));
 
-bool kill = false;
-
+bool shoot = false;
+list<Bullet> temp_bullets;
 
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode);
-
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void mouse_button_callback(GLFWwindow *window, int button, int action, int mods);
-
 void do_movement();
-
-float2 cursorPos;
-
-void destroy_enemies(vector<Asteroid> &asteroids, float4x4 &view, float4x4 &projection);
-
-inline bool hit(float4 &b_l, float4 &t_r);
-inline float2 normalize_cursor(double x, double y);
-
-unsigned int loadCubemap(vector<std::string> faces);
-
-unsigned int loadTexture(char const *path);
-
-void update_trash(vector<float3> &trash);
-
-
 inline void speed_control() {
     GLfloat currentFrame = glfwGetTime();
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
 }
+
+void destroy_enemies(vector<Asteroid> &asteroids, float4x4 &view, float4x4 &projection);
+void update_trash(vector<float3> &trash);
+void update_bullets(list<Bullet> &bullets){
+
+}
+inline bool hit(float4 &b_l, float4 &t_r){
+    return b_l.x <= cursorPos.x && b_l.y <= cursorPos.y && cursorPos.x <= t_r.x && cursorPos.y <= t_r.y;
+}
+inline float2 normalize_cursor(double x, double y){
+    return float2(2 * x / WIDTH - 1.0, 2 * (HEIGHT - y) / HEIGHT - 1.0);
+}
+
+unsigned int loadCubemap(vector<std::string> faces);
+
+unsigned int loadTexture(char const *path);
 
 int initGL() {
     int res = 0;
@@ -106,7 +109,6 @@ int main(int argc, char **argv) {
     //glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetMouseButtonCallback(window, mouse_button_callback);
 
-    //SOIL_load_image(faces[i].c_str(), &width, &height, &nrChannels, 0);
     GLFWimage cursor;
     cursor.pixels = SOIL_load_image("../cursor.png", &cursor.width, &cursor.height, 0, 0);
     glfwSetCursor(window, glfwCreateCursor(&cursor, 10, 10));
@@ -138,11 +140,10 @@ int main(int argc, char **argv) {
     shaders[GL_FRAGMENT_SHADER] = "sprite_fs.glsl";
     ShaderProgram sprite_shader(shaders);
 
-    shaders[GL_VERTEX_SHADER] = "trash_vs.glsl";
-    shaders[GL_GEOMETRY_SHADER] = "trash_gs.glsl";
-    shaders[GL_FRAGMENT_SHADER] = "trash_fs.glsl";
-    ShaderProgram trash_shader(shaders);
-    GL_CHECK_ERRORS;
+    shaders[GL_VERTEX_SHADER] = "lines_vs.glsl";
+    shaders[GL_GEOMETRY_SHADER] = "lines_gs.glsl";
+    shaders[GL_FRAGMENT_SHADER] = "lines_fs.glsl";
+    ShaderProgram lines_shader(shaders);
 
     glfwSwapInterval(1); // force 60 frames per second
 
@@ -304,11 +305,12 @@ int main(int argc, char **argv) {
     glGenBuffers(1, &trashVBO);
     glBindVertexArray(trashVAO);
     glBindBuffer(GL_ARRAY_BUFFER, trashVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(sky_vertices), sky_vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(trash_vectices), trash_vectices, GL_STATIC_DRAW);
 
     GLuint trashLocation = 0;
     glEnableVertexAttribArray(trashLocation);
-    glVertexAttribPointer(trashLocation, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid *) (0));
+    glVertexAttribPointer(trashLocation, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid *) (0));
+
     glBindVertexArray(0);
 
 
@@ -327,14 +329,6 @@ int main(int argc, char **argv) {
     sprite_shader.SetUniform("boom", 1);
     sprite_shader.StopUseShader();
 
-//    vector<std::string> faces{
-//            "../bg/right_mw.jpg",
-//            "../bg/left_mw.jpg",
-//            "../bg/top_mw.jpg",
-//            "../bg/bottom_mw.jpg",
-//            "../bg/front_mw.jpg",
-//            "../bg/back_mw.jpg"
-//    };
     vector <std::string> faces{
         "../bg/background.jpg",
         "../bg/background.jpg",
@@ -428,7 +422,7 @@ int main(int argc, char **argv) {
                   [](const Asteroid &p1, Asteroid &p2) {
                       return p1.position.z < p2.position.z;
                   });
-        if (kill){
+        if (shoot){
             destroy_enemies(asteroids, view, projection);
         }
         time_t current = time(0);
@@ -449,22 +443,45 @@ int main(int argc, char **argv) {
 
 
         /// trash
-        trash_shader.StartUseShader();
+        lines_shader.StartUseShader();
 
-        trash_shader.SetUniform("view", view);
-        trash_shader.SetUniform("projection", projection);
+        lines_shader.SetUniform("view", view);
+        lines_shader.SetUniform("projection", projection);
 
         glBindVertexArray(trashVAO);
-        trash_shader.SetUniform("direction", float3(0.0, 0.0, 1.0));
+        GL_CHECK_ERRORS;
+
+        lines_shader.SetUniform("direction", float3(0.0, 0.0, 1.0));
+        lines_shader.SetUniform("incolor", float3(0.5, 0.5, 0.5));
         for (auto &trash : trash_points){
             model = translate4x4(trash);
-            trash_shader.SetUniform("model", model);
+            lines_shader.SetUniform("model", model);
             glDrawArrays(GL_POINTS, 0, 1);
         }
         update_trash(trash_points);
+        lines_shader.StartUseShader();
+
+        /// Bullets
+        lines_shader.SetUniform("incolor", float3(0.0, 1.0, 0.0));
+        for (auto bull = temp_bullets.begin(); bull != temp_bullets.end();){
+            if (bull->actual){
+                model = translate4x4(bull->position);
+                lines_shader.SetUniform("model", model);
+                lines_shader.SetUniform("direction", bull->direction);
+                glDrawArrays(GL_POINTS, 0, 1);
+                bull->move();
+                ++bull;
+            } else {
+                auto tmp = bull;
+                ++tmp;
+                temp_bullets.erase(bull);
+                bull = tmp;
+            }
+        }
 
 
         glBindVertexArray(0);
+
 
 
         /// objects
@@ -559,10 +576,12 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
 
 void mouse_button_callback(GLFWwindow *window, int button, int action, int mods){
     if (button == GLFW_MOUSE_BUTTON_2 && action == GLFW_PRESS){
-        kill = true;
+        shoot = true;
         double x, y;
         glfwGetCursorPos(window, &x, &y);
         cursorPos = normalize_cursor(x, y);
+        float3 point(cursorPos.x * 25, cursorPos.y * 25, -50.0);
+        temp_bullets.emplace_back(Bullet(point));
     }
 }
 
@@ -576,22 +595,14 @@ void destroy_enemies(vector<Asteroid> &asteroids, float4x4 &view, float4x4 &proj
             t_r = mul(projection, mul(view, t_r));
             t_r /= t_r.w;
             if (hit(b_l, t_r)){
+                temp_bullets.emplace_back(Bullet(astro->position));
                 astro->kill();
                 break;
             }
         }
     }
-    kill = false;
+    shoot = false;
 }
-
-inline bool hit(float4 &b_l, float4 &t_r){
-    return b_l.x <= cursorPos.x && b_l.y <= cursorPos.y && cursorPos.x <= t_r.x && cursorPos.y <= t_r.y;
-}
-
-inline float2 normalize_cursor(double x, double y){
-    return float2(2 * x / WIDTH - 1.0, 2 * (HEIGHT - y) / HEIGHT - 1.0);
-}
-
 void update_trash(vector<float3> &trash){
     float3 direction(0.0, 0.0, 1.0);
     for (auto &coord : trash){

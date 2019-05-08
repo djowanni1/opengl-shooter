@@ -32,6 +32,9 @@ Asteroid::Asteroid(Sprite &astro, Sprite &boom) : SpriteAnimator(astro), boom(bo
 LiteMath::float3x3 Asteroid::animate() {
     if (is_alive) {
         position += direction * 10 * deltaTime;
+        if (position.z > cameraPos.z + 10){
+            this->kill();
+        }
         return animation();
     } else {
         return boom.animation();
@@ -49,4 +52,16 @@ void Asteroid::respawn() {
     position = LiteMath::float3(dis(gen), dis(gen), -100.0f + dis(gen));
     direction = normalize(cameraPos - position);
     boom.new_boom();
+}
+
+Bullet::Bullet(LiteMath::float3 &enemypos) : actual(true) {
+    position = cameraPos + LiteMath::float3(0.0, -1.0, -1.0);
+    direction = normalize(enemypos - position) * 10;
+}
+
+void Bullet::move() {
+    position += direction * 50 * deltaTime;
+    if (position.z < -100){
+        actual = false;
+    }
 }
