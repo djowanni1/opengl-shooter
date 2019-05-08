@@ -355,34 +355,17 @@ int main(int argc, char **argv) {
             Asteroid(asteroid2, explosion1),
             Asteroid(asteroid2, explosion1),
     };
-//    std::vector<Asteroid> trashes = {
-//            Asteroid(trash, explosion1),
-//            Asteroid(trash, explosion1),
-//            Asteroid(trash, explosion1),
-//            Asteroid(trash, explosion1),
-//    };
-//    std::vector<float3> trash_points = {
-//            float3(2.0, 2.0, -60.0),
-//            float3(-1.0, -1.0, -50.0),
-//            float3(-1.0, 1.0, -40.0),
-//            float3(-2.0, -2.0, -30.0),
-//            float3(3.0, -1.0, -70.0),
-//            float3(-3.0, -4.0, -35.0),
-//            float3(-4.5, 2.0, -40.0),
-//            float3(2.0, 3.0, -45.0),
-//            float3(-1.5, -2.0, -50.0),
-//            float3(-2.5, 2.0, -55.0),
-//
-//    };
+
     std::vector<float3> trash_points;
-    std::vector<float> points{-10.0, -7.0, -5.0, -2.0, -1.0, 1.0, 2.0, 5.0, 7.0, 10.0};
-    std::normal_distribution<> dis(-40.0, -70.0);
-    for (const auto &i : points){
-        for (const auto &j : points){
-            trash_points.emplace_back(i, j, dis(gen));
+    {
+        std::vector<float> points{-10.0, -7.0, -5.0, -2.0, -1.0, 1.0, 2.0, 5.0, 7.0, 10.0};
+        std::normal_distribution<> dis(-40.0, -70.0);
+        for (const auto &i : points) {
+            for (const auto &j : points) {
+                trash_points.emplace_back(i, j, dis(gen));
+            }
         }
     }
-    //std::uniform_int_distribution<> dis(1,2);
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
@@ -398,11 +381,6 @@ int main(int argc, char **argv) {
 
         float4x4 projection = transpose(
                 projectionMatrixTransposed(45.0f, (GLfloat) WIDTH / (GLfloat) HEIGHT, 0.1f, 100.0f));
-
-        if (kill){
-            //asteroids[0].is_alive = false;
-
-        }
 
         float4x4 model;
         /// Start shader ->
@@ -466,19 +444,6 @@ int main(int argc, char **argv) {
                 astro.respawn();
             }
         }
-//        glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_2D, trash.texture);
-//        for (auto &tra : trashes) {
-//            model = scale4x4(float3(0.1, 0.1, 0.1));
-//            model.row[0].w = tra.position.x;
-//            model.row[1].w = tra.position.y;
-//            model.row[2].w = tra.position.z;
-//            sprite_shader.SetUniform("model", model);
-//            sprite_shader.SetUniform("is_alive", tra.is_alive);
-//            sprite_shader.SetUniform("animation", tra.animate());
-//            glDrawArrays(GL_TRIANGLES, 0, 6);
-//        }
-
         glBindVertexArray(0);
         sprite_shader.StopUseShader();
 
@@ -490,6 +455,7 @@ int main(int argc, char **argv) {
         trash_shader.SetUniform("projection", projection);
 
         glBindVertexArray(trashVAO);
+        trash_shader.SetUniform("direction", float3(0.0, 0.0, 1.0));
         for (auto &trash : trash_points){
             model = translate4x4(trash);
             trash_shader.SetUniform("model", model);
@@ -515,13 +481,6 @@ int main(int argc, char **argv) {
         objects_shader.SetUniform("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
-//        glBindVertexArray(VAO);
-//
-//        model = translate4x4(float3(10.0f, 0.0f, 0.0f));
-//        objects_shader.SetUniform("model", model);
-//        glDrawArrays(GL_TRIANGLES, 0, 36);
-//
-//        glBindVertexArray(0);
         objects_shader.StopUseShader();
 
 
