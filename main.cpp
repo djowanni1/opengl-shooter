@@ -15,9 +15,14 @@
 #include <string>
 #include <random>
 #include <ctime>
+#include <list>
+//#include <assimp/Importer.hpp>
+//#include <assimp/scene.h>
+//#include <assimp/postprocess.h>
 
 using std::vector;
 using std::string;
+using std::list;
 using namespace LiteMath;
 static const GLsizei WIDTH = 640, HEIGHT = 640; //размеры окна
 
@@ -31,46 +36,51 @@ float3 cameraPos = float3(0.0f, 0.0f, 3.0f);
 float3 cameraFront = normalize(float3(0.0f, 0.0f, -1.0f));
 float3 cameraUp = normalize(float3(0.0f, 1.0f, 0.0f));
 
+float2 cursorPos;
+
 bool keys[1024];
 
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
+float score = 0;
+float health = 100;
 
 std::mt19937 gen(time(0));
 
-bool kill = false;
-
+list<Bullet> temp_bullets;
+float4x4 projection;
+float4x4 proj_inv;
+float4x4 view;
+float4x4 view_inv;
 
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode);
-
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void mouse_button_callback(GLFWwindow *window, int button, int action, int mods);
-
 void do_movement();
-
-float2 cursorPos;
-
-void destroy_enemies(vector<Asteroid> &asteroids, float4x4 &view, float4x4 &projection);
-
-inline bool hit(float4 &b_l, float4 &t_r);
-inline float2 normalize_cursor(double x, double y);
-
-unsigned int loadCubemap(vector<std::string> faces);
-
-unsigned int loadTexture(char const *path);
-
-void update_trash(vector<float3> &trash);
-
-
 inline void speed_control() {
     GLfloat currentFrame = glfwGetTime();
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
 }
 
+void destroy_enemies(vector<Enemy> &enemies);
+void update_trash(vector<float3> &trash);
+void update_health();
+
+inline float2 normalize_cursor(double x, double y){
+    return float2(2 * x / WIDTH - 1.0, 2 * (HEIGHT - y) / HEIGHT - 1.0);
+}
+
+//unsigned int loadCubemap(vector<std::string> faces);
+
+unsigned int loadTexture(char const *path);
+
+//void loadModel(const aiScene *loaded_obj, std::vector<GLfloat> &mesh, std::vector<GLfloat> &tex);
+
+void draw_text_info(ShaderProgram &font_shader, int sc, int hea);
+
 int initGL() {
-    int res = 0;
     if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
         std::cout << "Failed to initialize OpenGL context" << std::endl;
         return -1;
@@ -106,7 +116,6 @@ int main(int argc, char **argv) {
     //glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetMouseButtonCallback(window, mouse_button_callback);
 
-    //SOIL_load_image(faces[i].c_str(), &width, &height, &nrChannels, 0);
     GLFWimage cursor;
     cursor.pixels = SOIL_load_image("../cursor.png", &cursor.width, &cursor.height, 0, 0);
     glfwSetCursor(window, glfwCreateCursor(&cursor, 10, 10));
@@ -138,11 +147,25 @@ int main(int argc, char **argv) {
     shaders[GL_FRAGMENT_SHADER] = "sprite_fs.glsl";
     ShaderProgram sprite_shader(shaders);
 
-    shaders[GL_VERTEX_SHADER] = "trash_vs.glsl";
-    shaders[GL_GEOMETRY_SHADER] = "trash_gs.glsl";
-    shaders[GL_FRAGMENT_SHADER] = "trash_fs.glsl";
-    ShaderProgram trash_shader(shaders);
-    GL_CHECK_ERRORS;
+    shaders[GL_VERTEX_SHADER] = "font_vs.glsl";
+    shaders[GL_FRAGMENT_SHADER] = "font_fs.glsl";
+    ShaderProgram font_shader(shaders);
+
+//    shaders[GL_VERTEX_SHADER] = "ship_vs.glsl";
+//    shaders[GL_FRAGMENT_SHADER] = "ship_fs.glsl";
+//    ShaderProgram ship_shader(shaders);
+
+    shaders[GL_VERTEX_SHADER] = "fog_vs.glsl";
+    //shaders[GL_GEOMETRY_SHADER] = "fog_gs.glsl";
+    shaders[GL_FRAGMENT_SHADER] = "fog_fs.glsl";
+    ShaderProgram fog_shader(shaders);
+
+    shaders[GL_VERTEX_SHADER] = "lines_vs.glsl";
+    shaders[GL_GEOMETRY_SHADER] = "lines_gs.glsl";
+    shaders[GL_FRAGMENT_SHADER] = "lines_fs.glsl";
+    ShaderProgram lines_shader(shaders);
+
+
 
     glfwSwapInterval(1); // force 60 frames per second
 
@@ -241,47 +264,12 @@ int main(int argc, char **argv) {
     // Sky VAO
     float sky_vertices[] = {
             // positions
-            -1.0f, 1.0f, -1.0f,
-            -1.0f, -1.0f, -1.0f,
-            1.0f, -1.0f, -1.0f,
-            1.0f, -1.0f, -1.0f,
-            1.0f, 1.0f, -1.0f,
-            -1.0f, 1.0f, -1.0f,
-
-            -1.0f, -1.0f, 1.0f,
-            -1.0f, -1.0f, -1.0f,
-            -1.0f, 1.0f, -1.0f,
-            -1.0f, 1.0f, -1.0f,
-            -1.0f, 1.0f, 1.0f,
-            -1.0f, -1.0f, 1.0f,
-
-            1.0f, -1.0f, -1.0f,
-            1.0f, -1.0f, 1.0f,
-            1.0f, 1.0f, 1.0f,
-            1.0f, 1.0f, 1.0f,
-            1.0f, 1.0f, -1.0f,
-            1.0f, -1.0f, -1.0f,
-
-            -1.0f, -1.0f, 1.0f,
-            -1.0f, 1.0f, 1.0f,
-            1.0f, 1.0f, 1.0f,
-            1.0f, 1.0f, 1.0f,
-            1.0f, -1.0f, 1.0f,
-            -1.0f, -1.0f, 1.0f,
-
-            -1.0f, 1.0f, -1.0f,
-            1.0f, 1.0f, -1.0f,
-            1.0f, 1.0f, 1.0f,
-            1.0f, 1.0f, 1.0f,
-            -1.0f, 1.0f, 1.0f,
-            -1.0f, 1.0f, -1.0f,
-
-            -1.0f, -1.0f, -1.0f,
-            -1.0f, -1.0f, 1.0f,
-            1.0f, -1.0f, -1.0f,
-            1.0f, -1.0f, -1.0f,
-            -1.0f, -1.0f, 1.0f,
-            1.0f, -1.0f, 1.0f
+            -1.0f, 1.0f, -1.0f, 0.0f, 1.0f,
+            -1.0f, -1.0f, -1.0f, 0.0f, 0.0f,
+            1.0f, -1.0f, -1.0f, 1.0f, 0.0f,
+            1.0f, -1.0f, -1.0f, 1.0f, 0.0f,
+            1.0f, 1.0f, -1.0f, 1.0f, 1.0f,
+            -1.0f, 1.0f, -1.0f, 0.0f, 1.0f
     };
     GLuint skyVBO, skyVAO;
     glGenVertexArrays(1, &skyVAO);
@@ -292,7 +280,11 @@ int main(int argc, char **argv) {
 
     GLuint skyLocation = 0;
     glEnableVertexAttribArray(skyLocation);
-    glVertexAttribPointer(skyLocation, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid *) (0));
+    glVertexAttribPointer(skyLocation, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (0));
+
+    GLuint skyTexture = 1;
+    glEnableVertexAttribArray(skyTexture);
+    glVertexAttribPointer(skyTexture, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (3 * sizeof(GLfloat)));
     glBindVertexArray(0);
 
     // Trash VAO
@@ -304,86 +296,122 @@ int main(int argc, char **argv) {
     glGenBuffers(1, &trashVBO);
     glBindVertexArray(trashVAO);
     glBindBuffer(GL_ARRAY_BUFFER, trashVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(sky_vertices), sky_vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(trash_vectices), trash_vectices, GL_STATIC_DRAW);
 
     GLuint trashLocation = 0;
     glEnableVertexAttribArray(trashLocation);
-    glVertexAttribPointer(trashLocation, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid *) (0));
+    glVertexAttribPointer(trashLocation, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid *) (0));
+
     glBindVertexArray(0);
 
+//    Assimp::Importer importer;
+//    const aiScene *loaded_obj = importer.ReadFile("../models/ship1/WR.obj", aiProcess_Triangulate);
+//
+//    std::vector<GLfloat> ship1_mesh;
+//    std::vector<GLfloat> ship1_texture_coords;
+//    loadModel(loaded_obj, ship1_mesh, ship1_texture_coords);
+//    std::cout << ship1_mesh.size() << ' ' << ship1_texture_coords.size() << '\n';
+////    for (int i = 0; i < ship1_mesh.size(); i+=3){
+////        std::cout << ship1_mesh[i] << ' ' << ship1_mesh[i+1] << ' ' << ship1_mesh[i+2] << '\n';
+////    }
+//    GLuint shipVBO, shipVAO;
+//    glGenVertexArrays(1, &shipVAO);
+//    glGenBuffers(1, &shipVBO);
+//    glBindVertexArray(shipVAO);
+//    glBindBuffer(GL_ARRAY_BUFFER, shipVBO);
+//    glBufferData(GL_ARRAY_BUFFER, ship1_mesh.size() * sizeof(GLfloat), ship1_mesh.data(), GL_STATIC_DRAW);
+//
+//    GLuint shipLocation = 0;
+//    glEnableVertexAttribArray(shipLocation);
+//    glVertexAttribPointer(shipLocation, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid *) (0));
+//
+//    glBindVertexArray(0);
 
-    // Load and create a texture
-    GLuint texture1 = loadTexture("../cockpit.png");
-    objects_shader.StartUseShader();
-    objects_shader.SetUniform("Texture", 0);
-    objects_shader.StopUseShader();
+    /// Load and create a texture
+    GLuint cockpit_tex = loadTexture("../cockpit.png");
+    GLuint fog_tex = loadTexture("../fog.png");
 
     Sprite explosion1(loadTexture("../boom.png"), 9, 9, 81);
     Sprite asteroid1(loadTexture("../asteroid1.png"), 8, 8, 32);
     Sprite asteroid2(loadTexture("../asteroid2.png"), 5, 6, 30);
-    //Sprite trash(loadTexture("../trash.png"), 1, 1, 1);
+
+    Sprite ship1(loadTexture("../ship1.png"), 1, 1, 1);
+    Sprite ship2(loadTexture("../ship2.png"), 1, 1, 1);
+    Sprite ship3(loadTexture("../ship3.png"), 1, 1, 1);
+
+    GLuint bgt = loadTexture("../background.jpg");
+
+    GLuint digits_tex = loadTexture("../digits.png");
+    GLuint score_tex = loadTexture("../score.png");
+    GLuint health_tex = loadTexture("../health.png");
+
+
+    /// Presetting uniforms
+    projection = transpose(projectionMatrixTransposed(45.0f, (GLfloat) WIDTH / (GLfloat) HEIGHT, 0.1f, 100.0f));
+    proj_inv = inverse4x4(projection);
+    view = float4x4();
+
+    objects_shader.StartUseShader();
+    objects_shader.SetUniform("projection", projection);
+    objects_shader.SetUniform("Texture", 0);
+    objects_shader.StopUseShader();
+
     sprite_shader.StartUseShader();
+    sprite_shader.SetUniform("projection", projection);
     sprite_shader.SetUniform("Texture", 0);
     sprite_shader.SetUniform("boom", 1);
     sprite_shader.StopUseShader();
 
-//    vector<std::string> faces{
-//            "../bg/right_mw.jpg",
-//            "../bg/left_mw.jpg",
-//            "../bg/top_mw.jpg",
-//            "../bg/bottom_mw.jpg",
-//            "../bg/front_mw.jpg",
-//            "../bg/back_mw.jpg"
-//    };
-    vector <std::string> faces{
-        "../bg/background.jpg",
-        "../bg/background.jpg",
-        "../bg/background.jpg",
-        "../bg/background.jpg",
-        "../bg/background.jpg",
-        "../bg/background.jpg"
-    };
-    GLuint background_tex = loadCubemap(faces);
-
     sky_shader.StartUseShader();
-    sky_shader.SetUniform("skybox", 0);
+    sky_shader.SetUniform("projection", projection);
+    sky_shader.SetUniform("view", view);
+    sky_shader.SetUniform("bg", 0);
     sky_shader.StopUseShader();
 
-    std::vector<Asteroid> asteroids = {
-            Asteroid(asteroid1, explosion1),
-            Asteroid(asteroid1, explosion1),
-            Asteroid(asteroid2, explosion1),
-            Asteroid(asteroid2, explosion1),
+    lines_shader.StartUseShader();
+    lines_shader.SetUniform("projection", projection);
+    lines_shader.StopUseShader();
+
+    fog_shader.StartUseShader();
+    fog_shader.SetUniform("projection", projection);
+    fog_shader.StopUseShader();
+
+    font_shader.StartUseShader();
+    font_shader.SetUniform("projection", projection);
+    font_shader.SetUniform("Texture", 0);
+    font_shader.SetUniform("score", 1);
+    font_shader.SetUniform("health", 2);
+    font_shader.StopUseShader();
+
+//    ship_shader.StartUseShader();
+//    ship_shader.SetUniform("projection", projection);
+//    ship_shader.StopUseShader();
+
+    std::vector<Enemy> enemies = {
+            Enemy(asteroid1, explosion1, false),
+            Enemy(asteroid1, explosion1, false),
+            Enemy(asteroid2, explosion1, false),
+            Enemy(asteroid2, explosion1, false),
+            Enemy(ship1, explosion1, true),
+            Enemy(ship2, explosion1, true),
+            Enemy(ship3, explosion1, true),
     };
-//    std::vector<Asteroid> trashes = {
-//            Asteroid(trash, explosion1),
-//            Asteroid(trash, explosion1),
-//            Asteroid(trash, explosion1),
-//            Asteroid(trash, explosion1),
-//    };
-//    std::vector<float3> trash_points = {
-//            float3(2.0, 2.0, -60.0),
-//            float3(-1.0, -1.0, -50.0),
-//            float3(-1.0, 1.0, -40.0),
-//            float3(-2.0, -2.0, -30.0),
-//            float3(3.0, -1.0, -70.0),
-//            float3(-3.0, -4.0, -35.0),
-//            float3(-4.5, 2.0, -40.0),
-//            float3(2.0, 3.0, -45.0),
-//            float3(-1.5, -2.0, -50.0),
-//            float3(-2.5, 2.0, -55.0),
-//
-//    };
+
     std::vector<float3> trash_points;
-    std::vector<float> points{-10.0, -7.0, -5.0, -2.0, -1.0, 1.0, 2.0, 5.0, 7.0, 10.0};
-    std::normal_distribution<> dis(-40.0, -70.0);
-    for (const auto &i : points){
-        for (const auto &j : points){
-            trash_points.emplace_back(i, j, dis(gen));
+    {
+        std::vector<float> points{-10.0, -7.0, -5.0, -2.0, -1.0, 1.0, 2.0, 5.0, 7.0, 10.0};
+        std::normal_distribution<> dis(-40.0, -70.0);
+        for (const auto &i : points) {
+            for (const auto &j : points) {
+                trash_points.emplace_back(i, j, dis(gen));
+            }
         }
     }
-    //std::uniform_int_distribution<> dis(1,2);
-    while (!glfwWindowShouldClose(window)) {
+
+    float4x4 model;
+    std::vector<Fog> fogs(15, Fog(fog_tex));
+
+    while (!glfwWindowShouldClose(window) && health > 0) {
         glfwPollEvents();
 
         // Camera movements
@@ -394,140 +422,171 @@ int main(int argc, char **argv) {
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-        float4x4 view = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));
+        view = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));
+        view_inv = inverse4x4(view);
 
-        float4x4 projection = transpose(
-                projectionMatrixTransposed(45.0f, (GLfloat) WIDTH / (GLfloat) HEIGHT, 0.1f, 100.0f));
-
-        if (kill){
-            //asteroids[0].is_alive = false;
-
-        }
-
-        float4x4 model;
-        /// Start shader ->
-        /// set view and projection matrix ->
-        /// activate texture ->
-        /// bind VAO ->
-        /// model matrix + draw ->
-        /// unbind VAO -> stop shader
-
-        /// sky
-        //glDepthMask(GL_FALSE);
+        /// Sky
         glDepthFunc(GL_LEQUAL);
         sky_shader.StartUseShader();
-
-        view.row[0].w = 0.0f;
-        view.row[1].w = 0.0f;
-        view.row[2].w = 0.0f;
-        sky_shader.SetUniform("view", view);
-        sky_shader.SetUniform("projection", projection);
-
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, background_tex);
-
+        glBindTexture(GL_TEXTURE_2D, bgt);
         glBindVertexArray(skyVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-
+        glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
         sky_shader.StopUseShader();
         glDepthFunc(GL_LESS);
-        //glDepthMask(GL_TRUE);
 
-        view = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));
+        /// Fog
+        fog_shader.StartUseShader();
+        fog_shader.SetUniform("view", view);
+        std::sort(fogs.begin(), fogs.end(),
+                  [](const Fog &p1, Fog &p2) {
+                      return p1.position.z < p2.position.z;
+                  });
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, fog_tex);
+        glBindVertexArray(planeVAO);
+
+        for (auto &flying_fog : fogs){
+            if (flying_fog.actual == false){
+                flying_fog = Fog(fog_tex);
+                continue;
+            }
+            model = rotate_Z_4x4(lastFrame * flying_fog.speed / 3);
+            model.row[0].w = flying_fog.position.x;
+            model.row[1].w = flying_fog.position.y;
+            model.row[2].w = flying_fog.position.z;
+            fog_shader.SetUniform("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+
+            flying_fog.move();
+        }
+        fog_shader.StopUseShader();
+        glBindVertexArray(0);
 
         /// Sprites
         sprite_shader.StartUseShader();
-
         sprite_shader.SetUniform("view", view);
-        sprite_shader.SetUniform("projection", projection);
 
         glBindVertexArray(planeVAO);
 
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, explosion1.texture);
-        std::sort(asteroids.begin(), asteroids.end(),
-                  [](const Asteroid &p1, Asteroid &p2) {
+        std::sort(enemies.begin(), enemies.end(),
+                  [](const Enemy &p1, Enemy &p2) {
                       return p1.position.z < p2.position.z;
                   });
-        if (kill){
-            destroy_enemies(asteroids, view, projection);
-        }
+        destroy_enemies(enemies);
         time_t current = time(0);
-        for (auto &astro : asteroids) {
+        for (auto &enemy : enemies) {
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, astro.texture);
-            model = translate4x4(astro.position);
+            glBindTexture(GL_TEXTURE_2D, enemy.texture);
+            model = translate4x4(enemy.position);
             sprite_shader.SetUniform("model", model);
-            sprite_shader.SetUniform("is_alive", astro.is_alive);
-            sprite_shader.SetUniform("animation", astro.animate());
+            sprite_shader.SetUniform("is_alive", enemy.is_alive);
+            sprite_shader.SetUniform("animation", enemy.animate());
             glDrawArrays(GL_TRIANGLES, 0, 6);
-            if (!astro.is_alive && (current - astro.time_of_death) > 5){
-                astro.respawn();
+            if (!enemy.is_alive && (current - enemy.time_of_death) > 5) {
+                enemy.respawn();
+            }
+            if (enemy.is_ship && enemy.is_alive && (current - enemy.time_of_shoot) > 3 && enemy.position.z > -30){
+                temp_bullets.push_back(enemy.shoot());
             }
         }
-//        glActiveTexture(GL_TEXTURE0);
-//        glBindTexture(GL_TEXTURE_2D, trash.texture);
-//        for (auto &tra : trashes) {
-//            model = scale4x4(float3(0.1, 0.1, 0.1));
-//            model.row[0].w = tra.position.x;
-//            model.row[1].w = tra.position.y;
-//            model.row[2].w = tra.position.z;
-//            sprite_shader.SetUniform("model", model);
-//            sprite_shader.SetUniform("is_alive", tra.is_alive);
-//            sprite_shader.SetUniform("animation", tra.animate());
-//            glDrawArrays(GL_TRIANGLES, 0, 6);
-//        }
-
         glBindVertexArray(0);
         sprite_shader.StopUseShader();
 
 
-        /// trash
-        trash_shader.StartUseShader();
-
-        trash_shader.SetUniform("view", view);
-        trash_shader.SetUniform("projection", projection);
+        /// Flying lines
+        lines_shader.StartUseShader();
+        lines_shader.SetUniform("view", view);
 
         glBindVertexArray(trashVAO);
+
+        lines_shader.SetUniform("direction", float3(0.0, 0.0, 1.0));
+        lines_shader.SetUniform("incolor", float3(0.0, 0.5, 0.75));
         for (auto &trash : trash_points){
             model = translate4x4(trash);
-            trash_shader.SetUniform("model", model);
+            lines_shader.SetUniform("model", model);
             glDrawArrays(GL_POINTS, 0, 1);
         }
         update_trash(trash_points);
 
+        /// Bullets
+
+        for (auto bull = temp_bullets.begin(); bull != temp_bullets.end();){
+            if (bull->actual){
+                model = translate4x4(bull->position);
+                if (bull->enemy_strike){
+                    lines_shader.SetUniform("incolor", float3(1.0, 0.0, 0.0));
+                } else {
+                    lines_shader.SetUniform("incolor", float3(0.0, 1.0, 0.0));
+                }
+                lines_shader.SetUniform("model", model);
+                lines_shader.SetUniform("direction", bull->direction);
+                glDrawArrays(GL_POINTS, 0, 1);
+                bull->move();
+                ++bull;
+            } else {
+                auto tmp = bull;
+                ++tmp;
+                temp_bullets.erase(bull);
+                bull = tmp;
+            }
+        }
+
+        lines_shader.StopUseShader();
 
         glBindVertexArray(0);
 
-
-        /// objects
+        /// Cockpit
         objects_shader.StartUseShader();
-
         objects_shader.SetUniform("view", view);
-        objects_shader.SetUniform("projection", projection);
 
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture1);
+        glBindTexture(GL_TEXTURE_2D, cockpit_tex);
 
         glBindVertexArray(planeVAO);
-        model = translate4x4(cameraPos + float3(0.0f, -0.0f, -1.1f));
+        model = translate4x4(cameraPos + float3(0.0f, 0.0f, -1.1f));
         objects_shader.SetUniform("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
-//        glBindVertexArray(VAO);
-//
-//        model = translate4x4(float3(10.0f, 0.0f, 0.0f));
-//        objects_shader.SetUniform("model", model);
-//        glDrawArrays(GL_TRIANGLES, 0, 36);
-//
-//        glBindVertexArray(0);
         objects_shader.StopUseShader();
+
+        /// Score-health info
+
+        font_shader.StartUseShader();
+        font_shader.SetUniform("view", view);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, digits_tex);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, score_tex);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, health_tex);
+
+        glBindVertexArray(planeVAO);
+        draw_text_info(font_shader, int(score), int(health));
+
+        glBindVertexArray(0);
+        font_shader.StopUseShader();
+
+//        ship_shader.StartUseShader();
+//
+//        ship_shader.SetUniform("view", view);
+//        glBindVertexArray(shipVAO);
+//        model = translate4x4(float3(0.0f, 0.0f, -30.0f));
+//        ship_shader.SetUniform("model", model);
+//        glDrawArrays(GL_TRIANGLES, 0, ship1_mesh.size() / 3);
+//        //glDrawElements(GL_TRIANGLES, ship1_mesh.size() / 3, GL_UNSIGNED_INT, 0);
 
 
         GL_CHECK_ERRORS;
 
         glfwSwapBuffers(window);
+        score += deltaTime;
+        health = health + deltaTime;
+        health = health > 100 ? 100 : health;
     }
 
     glDeleteVertexArrays(1, &VAO);
@@ -600,37 +659,38 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
 
 void mouse_button_callback(GLFWwindow *window, int button, int action, int mods){
     if (button == GLFW_MOUSE_BUTTON_2 && action == GLFW_PRESS){
-        kill = true;
         double x, y;
         glfwGetCursorPos(window, &x, &y);
         cursorPos = normalize_cursor(x, y);
+        float4 mda = mul(proj_inv, float4(cursorPos.x, cursorPos.y, 1.0, 1.0));
+        mda = mul(view_inv, mda);
+        mda /= mda.w;
+        temp_bullets.emplace_back(Bullet(float3(mda.x, mda.y, mda.z), false));
     }
 }
 
-void destroy_enemies(vector<Asteroid> &asteroids, float4x4 &view, float4x4 &projection){
-    for (auto astro = asteroids.rbegin(); astro != asteroids.rend(); ++astro){
-        if (astro->is_alive){
-            auto b_l = float4(astro->position + float3(-0.5, -0.5, 0.0));
-            b_l = mul(projection, mul(view, b_l));
-            b_l /= b_l.w;
-            auto t_r = float4(astro->position + float3(0.5, 0.5, 0.0));
-            t_r = mul(projection, mul(view, t_r));
-            t_r /= t_r.w;
-            if (hit(b_l, t_r)){
-                astro->kill();
-                break;
+inline bool hit(const Bullet &b, const float3 &a){
+    return length(a - b.position) < 0.5;
+}
+
+void destroy_enemies(vector<Enemy> &enemies){
+    for (auto bullet : temp_bullets){
+        if (!bullet.enemy_strike){
+            for (auto enemy = enemies.rbegin(); enemy != enemies.rend(); ++enemy){
+                if (enemy->is_alive && bullet.actual){
+                    if (hit(bullet, enemy->position)){
+                        enemy->kill();
+                        score += 25;
+                    }
+                }
+            }
+        } else {
+            if (hit(bullet, cameraPos + float3(0.0, -1.0, 0.0))){
+                health -= 1;
             }
         }
+
     }
-    kill = false;
-}
-
-inline bool hit(float4 &b_l, float4 &t_r){
-    return b_l.x <= cursorPos.x && b_l.y <= cursorPos.y && cursorPos.x <= t_r.x && cursorPos.y <= t_r.y;
-}
-
-inline float2 normalize_cursor(double x, double y){
-    return float2(2 * x / WIDTH - 1.0, 2 * (HEIGHT - y) / HEIGHT - 1.0);
 }
 
 void update_trash(vector<float3> &trash){
@@ -643,7 +703,7 @@ void update_trash(vector<float3> &trash){
     }
 }
 
-unsigned int loadCubemap(vector<std::string> faces) {
+/*unsigned int loadCubemap(vector<std::string> faces) {
     unsigned int textureID;
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
@@ -670,7 +730,7 @@ unsigned int loadCubemap(vector<std::string> faces) {
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
     return textureID;
-}
+}*/
 
 unsigned int loadTexture(char const *path) {
     unsigned int textureID;
@@ -706,3 +766,72 @@ unsigned int loadTexture(char const *path) {
 }
 
 
+
+void draw_text_info(ShaderProgram &font_shader, int sc, int hea){
+    int s1 = sc / 1000;
+    int s2= sc / 100 % 10;
+    int s3 = sc / 10 % 10;
+    int s4 = sc % 10;
+    int h1 = hea / 100;
+    int h2 = hea / 10 % 10;
+    int h3 = hea % 10;
+    float4x4 model;
+    model = translate4x4(cameraPos + float3(-0.35f, -0.375f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", -1);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    model = translate4x4(cameraPos + float3(-0.4f, -0.4f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", s1);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    model = translate4x4(cameraPos + float3(-0.375f, -0.4f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", s2);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    model = translate4x4(cameraPos + float3(-0.35f, -0.4f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", s3);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    model = translate4x4(cameraPos + float3(-0.325f, -0.4f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", s4);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    model = translate4x4(cameraPos + float3(0.34f, -0.375f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", -2);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    model = translate4x4(cameraPos + float3(0.35f, -0.4f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", h1);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    model = translate4x4(cameraPos + float3(0.375f, -0.4f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", h2);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    model = translate4x4(cameraPos + float3(0.4f, -0.4f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", h3);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+}
+
+
+//void loadModel(const aiScene *loaded_obj, std::vector<GLfloat> &mesh, std::vector<GLfloat> &tex){
+//    for (int i = 0; i < loaded_obj->mNumMeshes; ++i){
+//        auto cur_mesh = loaded_obj->mMeshes[i];
+//        for (int j = 0; j < cur_mesh->mNumVertices; ++j){
+//            mesh.push_back(cur_mesh->mVertices->x);
+//            mesh.push_back(cur_mesh->mVertices->y);
+//            mesh.push_back(cur_mesh->mVertices->z);
+//        }
+//        if (cur_mesh->mTextureCoords[0] != nullptr){
+//            for (int j = 0; j < cur_mesh->mNumVertices; ++j) {
+//                tex.push_back(cur_mesh->mTextureCoords[0][j].x);
+//                tex.push_back(cur_mesh->mTextureCoords[0][j].y);
+//            }
+//        }
+//    }
+//}

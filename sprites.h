@@ -50,7 +50,18 @@ public:
     void new_boom();
 };
 
-class Asteroid : public SpriteAnimator{
+class Bullet{
+public:
+    bool actual;
+    bool enemy_strike;
+    LiteMath::float3 position;
+    LiteMath::float3 direction;
+    explicit Bullet(LiteMath::float3 enemypos);
+    explicit Bullet(LiteMath::float3 enemypos, bool enemy_strike);
+    void move();
+};
+
+class Enemy : public SpriteAnimator{
 private:
     Explosion boom;
     LiteMath::float3 direction;
@@ -63,15 +74,29 @@ private:
 
 public:
     bool is_alive;
+    bool is_ship;
+    time_t time_of_shoot;
     time_t time_of_death = 0;
     LiteMath::float3 position;
 
-    Asteroid(Sprite &astro, Sprite &boom);
+    Enemy(Sprite &astro, Sprite &boom, bool is_ship);
 
     LiteMath::float3x3 animate();
 
     void kill();
     void respawn();
+    Bullet shoot();
+};
+
+
+class Fog{
+public:
+    bool actual;
+    LiteMath::float3 position;
+    unsigned texture;
+    float speed;
+    Fog(int tex);
+    void move();
 };
 
 #endif //MAIN_SPRITES_H

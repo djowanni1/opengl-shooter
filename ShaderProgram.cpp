@@ -232,3 +232,16 @@ void ShaderProgram::SetUniform(const std::string &location, LiteMath::float3x3 a
 
     glUniformMatrix3fv(uniformLocation, 1, true, a_mat.L());
 }
+
+void ShaderProgram::SetUniform(const std::string &location, LiteMath::float3 a_mat) const
+{
+    GLint uniformLocation = glGetUniformLocation(shaderProgram, location.c_str());
+    if (uniformLocation == -1)
+    {
+        std::cerr << "Uniform  " << location << " not found" << std::endl;
+        return;
+    }
+    float arr[] = {a_mat.x, a_mat.y, a_mat.z};
+    glUniform3fv(uniformLocation, 1, arr);
+    //glUniformMatrix3fv(uniformLocation, 1, true, a_mat.L());
+}

@@ -197,6 +197,8 @@ namespace LiteMath {
 
     static inline int min(int a, int b) { return a < b ? a : b; }
 
+    static inline int min(float a, float b) { return a < b ? a : b; }
+
 
 #define SQR(x) ((x)*(x))
 
