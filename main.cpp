@@ -57,7 +57,6 @@ float4x4 view;
 float4x4 view_inv;
 
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode);
-void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void mouse_button_callback(GLFWwindow *window, int button, int action, int mods);
 void do_movement();
 inline void speed_control() {
@@ -68,17 +67,12 @@ inline void speed_control() {
 
 void destroy_enemies(vector<Enemy> &enemies);
 void update_trash(vector<float3> &trash);
-void update_health();
 
 inline float2 normalize_cursor(double x, double y){
     return float2(2 * x / WIDTH - 1.0, 2 * (HEIGHT - y) / HEIGHT - 1.0);
 }
 
-//unsigned int loadCubemap(vector<std::string> faces);
-
 unsigned int loadTexture(char const *path);
-
-//void loadModel(const aiScene *loaded_obj, std::vector<GLfloat> &mesh, std::vector<GLfloat> &tex);
 
 void draw_text_info(ShaderProgram &font_shader, int sc, int hea);
 
@@ -152,11 +146,6 @@ int main(int argc, char **argv) {
     shaders[GL_VERTEX_SHADER] = "font_vs.glsl";
     shaders[GL_FRAGMENT_SHADER] = "font_fs.glsl";
     ShaderProgram font_shader(shaders);
-
-//    shaders[GL_VERTEX_SHADER] = "ship_vs.glsl";
-//    shaders[GL_VERTEX_SHADER] = "ship_vs.glsl";
-//    shaders[GL_FRAGMENT_SHADER] = "ship_fs.glsl";
-//    ShaderProgram ship_shader(shaders);
 
     shaders[GL_VERTEX_SHADER] = "fog_vs.glsl";
     //shaders[GL_GEOMETRY_SHADER] = "fog_gs.glsl";
