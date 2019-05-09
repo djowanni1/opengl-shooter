@@ -117,7 +117,7 @@ int main(int argc, char **argv) {
     glfwSetMouseButtonCallback(window, mouse_button_callback);
 
     GLFWimage cursor;
-    cursor.pixels = SOIL_load_image("../cursor.png", &cursor.width, &cursor.height, 0, 0);
+    cursor.pixels = SOIL_load_image("../textures/cursor.png", &cursor.width, &cursor.height, 0, 0);
     glfwSetCursor(window, glfwCreateCursor(&cursor, 10, 10));
     if (initGL() != 0)
         return -1;
@@ -306,7 +306,7 @@ int main(int argc, char **argv) {
     glBindVertexArray(0);
 
 //    Assimp::Importer importer;
-//    const aiScene *loaded_obj = importer.ReadFile("../models/ship1/WR.obj", aiProcess_Triangulate);
+//    const aiScene *loaded_obj = importer.ReadFile("../textures/models/ship1/WR.obj", aiProcess_Triangulate);
 //
 //    std::vector<GLfloat> ship1_mesh;
 //    std::vector<GLfloat> ship1_texture_coords;
@@ -329,22 +329,22 @@ int main(int argc, char **argv) {
 //    glBindVertexArray(0);
 
     /// Load and create a texture
-    GLuint cockpit_tex = loadTexture("../cockpit.png");
-    GLuint fog_tex = loadTexture("../fog.png");
+    GLuint cockpit_tex = loadTexture("../textures/cockpit.png");
+    GLuint fog_tex = loadTexture("../textures/fog.png");
 
-    Sprite explosion1(loadTexture("../boom.png"), 9, 9, 81);
-    Sprite asteroid1(loadTexture("../asteroid1.png"), 8, 8, 32);
-    Sprite asteroid2(loadTexture("../asteroid2.png"), 5, 6, 30);
+    Sprite explosion1(loadTexture("../textures/boom.png"), 9, 9, 81);
+    Sprite asteroid1(loadTexture("../textures/asteroid1.png"), 8, 8, 32);
+    Sprite asteroid2(loadTexture("../textures/asteroid2.png"), 5, 6, 30);
 
-    Sprite ship1(loadTexture("../ship1.png"), 1, 1, 1);
-    Sprite ship2(loadTexture("../ship2.png"), 1, 1, 1);
-    Sprite ship3(loadTexture("../ship3.png"), 1, 1, 1);
+    Sprite ship1(loadTexture("../textures/ship1.png"), 1, 1, 1);
+    Sprite ship2(loadTexture("../textures/ship2.png"), 1, 1, 1);
+    Sprite ship3(loadTexture("../textures/ship3.png"), 1, 1, 1);
 
-    GLuint bgt = loadTexture("../background.jpg");
+    GLuint bgt = loadTexture("../textures/background.jpg");
 
-    GLuint digits_tex = loadTexture("../digits.png");
-    GLuint score_tex = loadTexture("../score.png");
-    GLuint health_tex = loadTexture("../health.png");
+    GLuint digits_tex = loadTexture("../textures/digits.png");
+    GLuint score_tex = loadTexture("../textures/score.png");
+    GLuint health_tex = loadTexture("../textures/health.png");
 
 
     /// Presetting uniforms
