@@ -152,6 +152,7 @@ int main(int argc, char **argv) {
     ShaderProgram font_shader(shaders);
 
 //    shaders[GL_VERTEX_SHADER] = "ship_vs.glsl";
+//    shaders[GL_VERTEX_SHADER] = "ship_vs.glsl";
 //    shaders[GL_FRAGMENT_SHADER] = "ship_fs.glsl";
 //    ShaderProgram ship_shader(shaders);
 
