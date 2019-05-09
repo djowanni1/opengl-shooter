@@ -66,9 +66,8 @@ inline void speed_control() {
 
 void destroy_enemies(vector<Asteroid> &asteroids);
 void update_trash(vector<float3> &trash);
-void update_bullets(list<Bullet> &bullets){
+void update_health();
 
-}
 inline bool hit(float4 &b_l, float4 &t_r){
     return b_l.x <= cursorPos.x && b_l.y <= cursorPos.y && cursorPos.x <= t_r.x && cursorPos.y <= t_r.y;
 }
@@ -339,6 +338,7 @@ int main(int argc, char **argv) {
     Sprite asteroid1(loadTexture("../asteroid1.png"), 8, 8, 32);
     Sprite asteroid2(loadTexture("../asteroid2.png"), 5, 6, 30);
 
+    Sprite ship1(loadTexture("../ship1.png"), 1, 1, 1);
     GLuint bgt = loadTexture("../background.jpg");
 
     GLuint digits_tex = loadTexture("../digits.png");
@@ -388,10 +388,13 @@ int main(int argc, char **argv) {
 //    ship_shader.StopUseShader();
 
     std::vector<Asteroid> asteroids = {
-            Asteroid(asteroid1, explosion1),
-            Asteroid(asteroid1, explosion1),
-            Asteroid(asteroid2, explosion1),
-            Asteroid(asteroid2, explosion1),
+            Asteroid(asteroid1, explosion1, false),
+            //Asteroid(asteroid1, explosion1, false),
+            //Asteroid(asteroid2, explosion1, false),
+            Asteroid(asteroid2, explosion1, false),
+            Asteroid(ship1, explosion1, true),
+            Asteroid(ship1, explosion1, true),
+            Asteroid(ship1, explosion1, true),
     };
 
     std::vector<float3> trash_points;
@@ -407,21 +410,6 @@ int main(int argc, char **argv) {
 
     float4x4 model;
     std::vector<Fog> fogs(15, Fog(fog_tex));
-//    = {
-//            Fog(fog_tex),
-//            Fog(fog_tex),
-//            Fog(fog_tex),
-//            Fog(fog_tex),
-//            Fog(fog_tex),
-//            Fog(fog_tex),
-//            Fog(fog_tex),
-//            Fog(fog_tex),
-//            Fog(fog_tex),
-//            Fog(fog_tex),
-//            Fog(fog_tex),
-//            Fog(fog_tex),
-//            Fog(fog_tex)
-//    };
 
     while (!glfwWindowShouldClose(window) && health > 0) {
         glfwPollEvents();
@@ -501,6 +489,9 @@ int main(int argc, char **argv) {
             if (!astro.is_alive && (current - astro.time_of_death) > 5) {
                 astro.respawn();
             }
+            if (astro.is_ship && astro.is_alive && (current - astro.time_of_shoot) > 3 && astro.position.z > -30){
+                temp_bullets.push_back(astro.shoot());
+            }
         }
         glBindVertexArray(0);
         sprite_shader.StopUseShader();
@@ -522,10 +513,15 @@ int main(int argc, char **argv) {
         update_trash(trash_points);
 
         /// Bullets
-        lines_shader.SetUniform("incolor", float3(0.0, 1.0, 0.0));
+
         for (auto bull = temp_bullets.begin(); bull != temp_bullets.end();){
             if (bull->actual){
                 model = translate4x4(bull->position);
+                if (bull->enemy_strike){
+                    lines_shader.SetUniform("incolor", float3(1.0, 0.0, 0.0));
+                } else {
+                    lines_shader.SetUniform("incolor", float3(0.0, 1.0, 0.0));
+                }
                 lines_shader.SetUniform("model", model);
                 lines_shader.SetUniform("direction", bull->direction);
                 glDrawArrays(GL_POINTS, 0, 1);
@@ -538,6 +534,7 @@ int main(int argc, char **argv) {
                 bull = tmp;
             }
         }
+
         lines_shader.StopUseShader();
 
         glBindVertexArray(0);
@@ -668,32 +665,31 @@ void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
         float4 mda = mul(proj_inv, float4(cursorPos.x, cursorPos.y, 1.0, 1.0));
         mda = mul(view_inv, mda);
         mda /= mda.w;
-        temp_bullets.emplace_back(Bullet(float3(mda.x, mda.y, mda.z)));
+        temp_bullets.emplace_back(Bullet(float3(mda.x, mda.y, mda.z), false));
     }
 }
 
-inline bool hit(Bullet &b, Asteroid &a){
-    return length(a.position - b.position) < 0.5;
+inline bool hit(const Bullet &b, const float3 &a){
+    return length(a - b.position) < 0.5;
 }
 
 void destroy_enemies(vector<Asteroid> &asteroids){
     for (auto bullet : temp_bullets){
-        for (auto astro = asteroids.rbegin(); astro != asteroids.rend(); ++astro){
-            if (astro->is_alive && bullet.actual){
-//            auto b_l = float4(astro->position + float3(-0.5, -0.5, 0.0));
-//            b_l = mul(projection, mul(view, b_l));
-//            b_l /= b_l.w;
-//            auto t_r = float4(astro->position + float3(0.5, 0.5, 0.0));
-//            t_r = mul(projection, mul(view, t_r));
-//            t_r /= t_r.w;
-                if (hit(bullet, *astro)){
-                    astro->kill();
-                    score += 25;
-                    bullet.actual = false;
-                    break;
+        if (!bullet.enemy_strike){
+            for (auto astro = asteroids.rbegin(); astro != asteroids.rend(); ++astro){
+                if (astro->is_alive && bullet.actual){
+                    if (hit(bullet, astro->position)){
+                        astro->kill();
+                        score += 25;
+                    }
                 }
             }
+        } else {
+            if (hit(bullet, cameraPos + float3(0.0, -1.0, 0.0))){
+                health -= 1;
+            }
         }
+
     }
 }
 
@@ -821,6 +817,7 @@ void draw_text_info(ShaderProgram &font_shader, int sc, int hea){
     font_shader.SetUniform("number", h3);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
+
 
 //void loadModel(const aiScene *loaded_obj, std::vector<GLfloat> &mesh, std::vector<GLfloat> &tex){
 //    for (int i = 0; i < loaded_obj->mNumMeshes; ++i){
