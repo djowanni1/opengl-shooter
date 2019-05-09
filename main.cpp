@@ -168,73 +168,7 @@ int main(int argc, char **argv) {
     shaders[GL_FRAGMENT_SHADER] = "lines_fs.glsl";
     ShaderProgram lines_shader(shaders);
 
-
-
     glfwSwapInterval(1); // force 60 frames per second
-
-    //glVertexAttribPointer(location, data_len, type, normalize, stride, (GLvoid *)(offset))
-
-    // box VAO
-    float vertices[] = {
-            // positions          // texture Coords
-            -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
-            0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
-            0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
-            0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
-            -0.5f, 0.5f, -0.5f, 0.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
-
-            -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
-            0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
-            0.5f, 0.5f, 0.5f, 1.0f, 1.0f,
-            0.5f, 0.5f, 0.5f, 1.0f, 1.0f,
-            -0.5f, 0.5f, 0.5f, 0.0f, 1.0f,
-            -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
-
-            -0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
-            -0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-            -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
-            -0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
-
-            0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
-            0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
-            0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-            0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-            0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
-            0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
-
-            -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-            0.5f, -0.5f, -0.5f, 1.0f, 1.0f,
-            0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
-            0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
-            -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
-            -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-
-            -0.5f, 0.5f, -0.5f, 0.0f, 1.0f,
-            0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
-            0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
-            0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
-            -0.5f, 0.5f, 0.5f, 0.0f, 0.0f,
-            -0.5f, 0.5f, -0.5f, 0.0f, 1.0f
-    };
-    GLuint VBO, VAO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    GLuint vertexLocation = 0;
-    glEnableVertexAttribArray(vertexLocation);
-    glVertexAttribPointer(vertexLocation, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (0));
-
-    GLuint textureLocation = 1;
-    glEnableVertexAttribArray(textureLocation);
-    glVertexAttribPointer(textureLocation, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat),
-                          (GLvoid *) (3 * sizeof(GLfloat)));
-    glBindVertexArray(0);
 
     // Plane VAO
     float plane_vertices[] = {
@@ -307,29 +241,6 @@ int main(int argc, char **argv) {
 
     glBindVertexArray(0);
 
-//    Assimp::Importer importer;
-//    const aiScene *loaded_obj = importer.ReadFile("../textures/models/ship1/WR.obj", aiProcess_Triangulate);
-//
-//    std::vector<GLfloat> ship1_mesh;
-//    std::vector<GLfloat> ship1_texture_coords;
-//    loadModel(loaded_obj, ship1_mesh, ship1_texture_coords);
-//    std::cout << ship1_mesh.size() << ' ' << ship1_texture_coords.size() << '\n';
-////    for (int i = 0; i < ship1_mesh.size(); i+=3){
-////        std::cout << ship1_mesh[i] << ' ' << ship1_mesh[i+1] << ' ' << ship1_mesh[i+2] << '\n';
-////    }
-//    GLuint shipVBO, shipVAO;
-//    glGenVertexArrays(1, &shipVAO);
-//    glGenBuffers(1, &shipVBO);
-//    glBindVertexArray(shipVAO);
-//    glBindBuffer(GL_ARRAY_BUFFER, shipVBO);
-//    glBufferData(GL_ARRAY_BUFFER, ship1_mesh.size() * sizeof(GLfloat), ship1_mesh.data(), GL_STATIC_DRAW);
-//
-//    GLuint shipLocation = 0;
-//    glEnableVertexAttribArray(shipLocation);
-//    glVertexAttribPointer(shipLocation, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid *) (0));
-//
-//    glBindVertexArray(0);
-
     /// Load and create a texture
     GLuint cockpit_tex = loadTexture("../textures/cockpit.png");
     GLuint fog_tex = loadTexture("../textures/fog.png");
@@ -387,9 +298,6 @@ int main(int argc, char **argv) {
     font_shader.SetUniform("health", 2);
     font_shader.StopUseShader();
 
-//    ship_shader.StartUseShader();
-//    ship_shader.SetUniform("projection", projection);
-//    ship_shader.StopUseShader();
 
     std::vector<Enemy> enemies = {
             Enemy(asteroid1, explosion1, false),
@@ -455,7 +363,7 @@ int main(int argc, char **argv) {
         glBindVertexArray(planeVAO);
 
         for (auto &flying_fog : fogs){
-            if (flying_fog.actual == false){
+            if (!flying_fog.actual){
                 flying_fog = Fog(fog_tex);
                 continue;
             }
@@ -484,7 +392,7 @@ int main(int argc, char **argv) {
                       return p1.position.z < p2.position.z;
                   });
         destroy_enemies(enemies);
-        time_t current = time(0);
+        time_t current = time(nullptr);
         for (auto &enemy : enemies) {
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, enemy.texture);
@@ -584,17 +492,6 @@ int main(int argc, char **argv) {
 
         glBindVertexArray(0);
         font_shader.StopUseShader();
-
-//        ship_shader.StartUseShader();
-//
-//        ship_shader.SetUniform("view", view);
-//        glBindVertexArray(shipVAO);
-//        model = translate4x4(float3(0.0f, 0.0f, -30.0f));
-//        ship_shader.SetUniform("model", model);
-//        glDrawArrays(GL_TRIANGLES, 0, ship1_mesh.size() / 3);
-//        //glDrawElements(GL_TRIANGLES, ship1_mesh.size() / 3, GL_UNSIGNED_INT, 0);
-
-
         GL_CHECK_ERRORS;
 
         glfwSwapBuffers(window);
@@ -603,8 +500,8 @@ int main(int argc, char **argv) {
         health = health > 100 ? 100 : health;
     }
 
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
+    glDeleteVertexArrays(1, &trashVAO);
+    glDeleteBuffers(1, &trashVBO);
 
     glDeleteVertexArrays(1, &skyVAO);
     glDeleteBuffers(1, &skyVBO);
@@ -727,35 +624,6 @@ void update_trash(vector<float3> &trash){
     }
 }
 
-/*unsigned int loadCubemap(vector<std::string> faces) {
-    unsigned int textureID;
-    glGenTextures(1, &textureID);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
-
-    int width, height, nrChannels;
-    for (unsigned int i = 0; i < faces.size(); i++) {
-        unsigned char *data = SOIL_load_image(faces[i].c_str(), &width, &height, &nrChannels, 0);
-        std::cout << SOIL_last_result() << std::endl;
-        if (data) {
-            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
-                         0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data
-            );
-            SOIL_free_image_data(data);
-        } else {
-            std::cout << "Cubemap texture failed to load at path: " << faces[i] << std::endl;
-            SOIL_free_image_data(data);
-        }
-    }
-    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-    return textureID;
-}*/
-
 unsigned int loadTexture(char const *path) {
     unsigned int textureID;
     glGenTextures(1, &textureID);
@@ -788,8 +656,6 @@ unsigned int loadTexture(char const *path) {
 
     return textureID;
 }
-
-
 
 void draw_text_info(ShaderProgram &font_shader, int sc, int hea){
     int s1 = sc / 1000;
@@ -841,21 +707,3 @@ void draw_text_info(ShaderProgram &font_shader, int sc, int hea){
     font_shader.SetUniform("number", h3);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
-
-
-//void loadModel(const aiScene *loaded_obj, std::vector<GLfloat> &mesh, std::vector<GLfloat> &tex){
-//    for (int i = 0; i < loaded_obj->mNumMeshes; ++i){
-//        auto cur_mesh = loaded_obj->mMeshes[i];
-//        for (int j = 0; j < cur_mesh->mNumVertices; ++j){
-//            mesh.push_back(cur_mesh->mVertices->x);
-//            mesh.push_back(cur_mesh->mVertices->y);
-//            mesh.push_back(cur_mesh->mVertices->z);
-//        }
-//        if (cur_mesh->mTextureCoords[0] != nullptr){
-//            for (int j = 0; j < cur_mesh->mNumVertices; ++j) {
-//                tex.push_back(cur_mesh->mTextureCoords[0][j].x);
-//                tex.push_back(cur_mesh->mTextureCoords[0][j].y);
-//            }
-//        }
-//    }
-//}
