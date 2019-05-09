@@ -64,18 +64,15 @@ inline void speed_control() {
     lastFrame = currentFrame;
 }
 
-void destroy_enemies(vector<Asteroid> &asteroids);
+void destroy_enemies(vector<Enemy> &enemies);
 void update_trash(vector<float3> &trash);
 void update_health();
 
-inline bool hit(float4 &b_l, float4 &t_r){
-    return b_l.x <= cursorPos.x && b_l.y <= cursorPos.y && cursorPos.x <= t_r.x && cursorPos.y <= t_r.y;
-}
 inline float2 normalize_cursor(double x, double y){
     return float2(2 * x / WIDTH - 1.0, 2 * (HEIGHT - y) / HEIGHT - 1.0);
 }
 
-unsigned int loadCubemap(vector<std::string> faces);
+//unsigned int loadCubemap(vector<std::string> faces);
 
 unsigned int loadTexture(char const *path);
 
@@ -339,6 +336,9 @@ int main(int argc, char **argv) {
     Sprite asteroid2(loadTexture("../asteroid2.png"), 5, 6, 30);
 
     Sprite ship1(loadTexture("../ship1.png"), 1, 1, 1);
+    Sprite ship2(loadTexture("../ship2.png"), 1, 1, 1);
+    Sprite ship3(loadTexture("../ship3.png"), 1, 1, 1);
+
     GLuint bgt = loadTexture("../background.jpg");
 
     GLuint digits_tex = loadTexture("../digits.png");
@@ -387,14 +387,14 @@ int main(int argc, char **argv) {
 //    ship_shader.SetUniform("projection", projection);
 //    ship_shader.StopUseShader();
 
-    std::vector<Asteroid> asteroids = {
-            Asteroid(asteroid1, explosion1, false),
-            //Asteroid(asteroid1, explosion1, false),
-            //Asteroid(asteroid2, explosion1, false),
-            Asteroid(asteroid2, explosion1, false),
-            Asteroid(ship1, explosion1, true),
-            Asteroid(ship1, explosion1, true),
-            Asteroid(ship1, explosion1, true),
+    std::vector<Enemy> enemies = {
+            Enemy(asteroid1, explosion1, false),
+            Enemy(asteroid1, explosion1, false),
+            Enemy(asteroid2, explosion1, false),
+            Enemy(asteroid2, explosion1, false),
+            Enemy(ship1, explosion1, true),
+            Enemy(ship2, explosion1, true),
+            Enemy(ship3, explosion1, true),
     };
 
     std::vector<float3> trash_points;
@@ -472,25 +472,25 @@ int main(int argc, char **argv) {
 
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, explosion1.texture);
-        std::sort(asteroids.begin(), asteroids.end(),
-                  [](const Asteroid &p1, Asteroid &p2) {
+        std::sort(enemies.begin(), enemies.end(),
+                  [](const Enemy &p1, Enemy &p2) {
                       return p1.position.z < p2.position.z;
                   });
-        destroy_enemies(asteroids);
+        destroy_enemies(enemies);
         time_t current = time(0);
-        for (auto &astro : asteroids) {
+        for (auto &enemy : enemies) {
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, astro.texture);
-            model = translate4x4(astro.position);
+            glBindTexture(GL_TEXTURE_2D, enemy.texture);
+            model = translate4x4(enemy.position);
             sprite_shader.SetUniform("model", model);
-            sprite_shader.SetUniform("is_alive", astro.is_alive);
-            sprite_shader.SetUniform("animation", astro.animate());
+            sprite_shader.SetUniform("is_alive", enemy.is_alive);
+            sprite_shader.SetUniform("animation", enemy.animate());
             glDrawArrays(GL_TRIANGLES, 0, 6);
-            if (!astro.is_alive && (current - astro.time_of_death) > 5) {
-                astro.respawn();
+            if (!enemy.is_alive && (current - enemy.time_of_death) > 5) {
+                enemy.respawn();
             }
-            if (astro.is_ship && astro.is_alive && (current - astro.time_of_shoot) > 3 && astro.position.z > -30){
-                temp_bullets.push_back(astro.shoot());
+            if (enemy.is_ship && enemy.is_alive && (current - enemy.time_of_shoot) > 3 && enemy.position.z > -30){
+                temp_bullets.push_back(enemy.shoot());
             }
         }
         glBindVertexArray(0);
@@ -673,13 +673,13 @@ inline bool hit(const Bullet &b, const float3 &a){
     return length(a - b.position) < 0.5;
 }
 
-void destroy_enemies(vector<Asteroid> &asteroids){
+void destroy_enemies(vector<Enemy> &enemies){
     for (auto bullet : temp_bullets){
         if (!bullet.enemy_strike){
-            for (auto astro = asteroids.rbegin(); astro != asteroids.rend(); ++astro){
-                if (astro->is_alive && bullet.actual){
-                    if (hit(bullet, astro->position)){
-                        astro->kill();
+            for (auto enemy = enemies.rbegin(); enemy != enemies.rend(); ++enemy){
+                if (enemy->is_alive && bullet.actual){
+                    if (hit(bullet, enemy->position)){
+                        enemy->kill();
                         score += 25;
                     }
                 }
@@ -703,7 +703,7 @@ void update_trash(vector<float3> &trash){
     }
 }
 
-unsigned int loadCubemap(vector<std::string> faces) {
+/*unsigned int loadCubemap(vector<std::string> faces) {
     unsigned int textureID;
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
@@ -730,7 +730,7 @@ unsigned int loadCubemap(vector<std::string> faces) {
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
     return textureID;
-}
+}*/
 
 unsigned int loadTexture(char const *path) {
     unsigned int textureID;

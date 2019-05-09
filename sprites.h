@@ -61,7 +61,7 @@ public:
     void move();
 };
 
-class Asteroid : public SpriteAnimator{
+class Enemy : public SpriteAnimator{
 private:
     Explosion boom;
     LiteMath::float3 direction;
@@ -79,7 +79,7 @@ public:
     time_t time_of_death = 0;
     LiteMath::float3 position;
 
-    Asteroid(Sprite &astro, Sprite &boom, bool is_ship);
+    Enemy(Sprite &astro, Sprite &boom, bool is_ship);
 
     LiteMath::float3x3 animate();
 

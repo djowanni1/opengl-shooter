@@ -27,7 +27,7 @@ void Explosion::new_boom() {
 }
 
 
-Asteroid::Asteroid(Sprite &astro, Sprite &boom, bool is_ship)
+Enemy::Enemy(Sprite &astro, Sprite &boom, bool is_ship)
         : SpriteAnimator(astro), boom(boom),
           is_alive(true), is_ship(is_ship),
           time_of_shoot(time(0)) {
@@ -36,7 +36,7 @@ Asteroid::Asteroid(Sprite &astro, Sprite &boom, bool is_ship)
     direction = normalize(cameraPos - position);
 }
 
-LiteMath::float3x3 Asteroid::animate() {
+LiteMath::float3x3 Enemy::animate() {
     if (is_alive) {
         position += direction * 10 * deltaTime;
         if (position.z > cameraPos.z + 1) {
@@ -49,12 +49,12 @@ LiteMath::float3x3 Asteroid::animate() {
     }
 }
 
-void Asteroid::kill() {
+void Enemy::kill() {
     is_alive = false;
     time_of_death = time(0);
 }
 
-void Asteroid::respawn() {
+void Enemy::respawn() {
     is_alive = true;
     std::uniform_real_distribution<float> dis(-5, 5);
     position = LiteMath::float3(dis(gen), dis(gen), zfar + dis(gen));
@@ -62,7 +62,7 @@ void Asteroid::respawn() {
     boom.new_boom();
 }
 
-Bullet Asteroid::shoot() {
+Bullet Enemy::shoot() {
     time_of_shoot = time(0);
     return Bullet(position, true);
 }
