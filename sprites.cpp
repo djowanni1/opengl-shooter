@@ -6,6 +6,8 @@ extern std::mt19937 gen;
 
 extern LiteMath::float3 cameraPos;
 
+extern float health;
+
 SpriteAnimator::SpriteAnimator(Sprite &init)
         : texture(init.texture), stride_x(init.stride_x), stride_y(init.stride_y),
           count_frames(init.count_frames), scale_x(1.0 / init.stride_x),
@@ -32,7 +34,8 @@ Asteroid::Asteroid(Sprite &astro, Sprite &boom) : SpriteAnimator(astro), boom(bo
 LiteMath::float3x3 Asteroid::animate() {
     if (is_alive) {
         position += direction * 10 * deltaTime;
-        if (position.z > cameraPos.z + 10){
+        if (position.z > cameraPos.z + 1){
+            health -= 25;
             this->kill();
         }
         return animation();
@@ -60,7 +63,7 @@ Bullet::Bullet(LiteMath::float3 enemypos) : actual(true) {
 }
 
 void Bullet::move() {
-    position += direction * 25 * deltaTime;
+    position += direction * 10 * deltaTime;
     if (position.z < -100){
         actual = false;
     }

@@ -40,10 +40,11 @@ bool keys[1024];
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
+float score = 0;
+float health = 100;
 
 std::mt19937 gen(time(0));
 
-bool shoot = false;
 list<Bullet> temp_bullets;
 float4x4 projection;
 float4x4 proj_inv;
@@ -75,6 +76,8 @@ inline float2 normalize_cursor(double x, double y){
 unsigned int loadCubemap(vector<std::string> faces);
 
 unsigned int loadTexture(char const *path);
+
+void draw_text_info(ShaderProgram &font_shader, int sc, int hea);
 
 int initGL() {
     if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
@@ -142,6 +145,10 @@ int main(int argc, char **argv) {
     shaders[GL_VERTEX_SHADER] = "sprite_vs.glsl";
     shaders[GL_FRAGMENT_SHADER] = "sprite_fs.glsl";
     ShaderProgram sprite_shader(shaders);
+
+    shaders[GL_VERTEX_SHADER] = "font_vs.glsl";
+    shaders[GL_FRAGMENT_SHADER] = "font_fs.glsl";
+    ShaderProgram font_shader(shaders);
 
     shaders[GL_VERTEX_SHADER] = "lines_vs.glsl";
     shaders[GL_GEOMETRY_SHADER] = "lines_gs.glsl";
@@ -243,7 +250,7 @@ int main(int argc, char **argv) {
     glBindVertexArray(0);
 
     // Sky VAO
-    float sky_vertices[] = {
+    /*float sky_vertices[] = {
             // positions
             -1.0f, 1.0f, -1.0f,
             -1.0f, -1.0f, -1.0f,
@@ -286,6 +293,15 @@ int main(int argc, char **argv) {
             1.0f, -1.0f, -1.0f,
             -1.0f, -1.0f, 1.0f,
             1.0f, -1.0f, 1.0f
+    };*/
+    float sky_vertices[] = {
+            // positions
+            -1.0f, 1.0f, -1.0f, 0.0f, 1.0f,
+            -1.0f, -1.0f, -1.0f, 0.0f, 0.0f,
+            1.0f, -1.0f, -1.0f, 1.0f, 0.0f,
+            1.0f, -1.0f, -1.0f, 1.0f, 0.0f,
+            1.0f, 1.0f, -1.0f, 1.0f, 1.0f,
+            -1.0f, 1.0f, -1.0f, 0.0f, 1.0f
     };
     GLuint skyVBO, skyVAO;
     glGenVertexArrays(1, &skyVAO);
@@ -296,7 +312,11 @@ int main(int argc, char **argv) {
 
     GLuint skyLocation = 0;
     glEnableVertexAttribArray(skyLocation);
-    glVertexAttribPointer(skyLocation, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid *) (0));
+    glVertexAttribPointer(skyLocation, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (0));
+
+    GLuint skyTexture = 1;
+    glEnableVertexAttribArray(skyTexture);
+    glVertexAttribPointer(skyTexture, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (GLvoid *) (3 * sizeof(GLfloat)));
     glBindVertexArray(0);
 
     // Trash VAO
@@ -324,16 +344,20 @@ int main(int argc, char **argv) {
     Sprite asteroid1(loadTexture("../asteroid1.png"), 8, 8, 32);
     Sprite asteroid2(loadTexture("../asteroid2.png"), 5, 6, 30);
 
-    vector <std::string> faces{
-            "../bg/background.jpg",
-            "../bg/background.jpg",
-            "../bg/background.jpg",
-            "../bg/background.jpg",
-            "../bg/background.jpg",
-            "../bg/background.jpg"
-    };
-    GLuint background_tex = loadCubemap(faces);
+//    vector <std::string> faces{
+//            "../bg/background.jpg",
+//            "../bg/background.jpg",
+//            "../bg/background.jpg",
+//            "../bg/background.jpg",
+//            "../bg/background.jpg",
+//            "../bg/background.jpg"
+//    };
+//    GLuint background_tex = loadCubemap(faces);
+    GLuint bgt = loadTexture("../background.jpg");
 
+    GLuint digitstex = loadTexture("../digits.png");
+    GLuint scoretex = loadTexture("../score.png");
+    GLuint healthtex = loadTexture("../health.png");
     /// Presetting uniforms
     projection = transpose(
             projectionMatrixTransposed(45.0f, (GLfloat) WIDTH / (GLfloat) HEIGHT, 0.1f, 100.0f));
@@ -353,12 +377,20 @@ int main(int argc, char **argv) {
 
     sky_shader.StartUseShader();
     sky_shader.SetUniform("projection", projection);
-    sky_shader.SetUniform("skybox", 0);
+    //sky_shader.SetUniform("skybox", 1);
+    sky_shader.SetUniform("bg", 0);
     sky_shader.StopUseShader();
 
     lines_shader.StartUseShader();
     lines_shader.SetUniform("projection", projection);
     lines_shader.StopUseShader();
+
+    font_shader.StartUseShader();
+    font_shader.SetUniform("projection", projection);
+    font_shader.SetUniform("Texture", 0);
+    font_shader.SetUniform("score", 1);
+    font_shader.SetUniform("health", 2);
+    font_shader.StopUseShader();
 
     std::vector<Asteroid> asteroids = {
             Asteroid(asteroid1, explosion1),
@@ -381,7 +413,8 @@ int main(int argc, char **argv) {
 
 
     float4x4 model;
-    while (!glfwWindowShouldClose(window)) {
+
+    while (!glfwWindowShouldClose(window) && health > 0) {
         glfwPollEvents();
 
         // Camera movements
@@ -412,11 +445,13 @@ int main(int argc, char **argv) {
         sky_shader.SetUniform("view", view);
 
 
+//        glActiveTexture(GL_TEXTURE1);
+//        glBindTexture(GL_TEXTURE_CUBE_MAP, background_tex);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, background_tex);
+        glBindTexture(GL_TEXTURE_2D, bgt);
 
         glBindVertexArray(skyVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
         glBindVertexArray(0);
         sky_shader.StopUseShader();
@@ -439,9 +474,7 @@ int main(int argc, char **argv) {
                   [](const Asteroid &p1, Asteroid &p2) {
                       return p1.position.z < p2.position.z;
                   });
-        if (shoot){
-            destroy_enemies(asteroids);
-        }
+        destroy_enemies(asteroids);
         time_t current = time(0);
         for (auto &astro : asteroids) {
             glActiveTexture(GL_TEXTURE0);
@@ -451,7 +484,7 @@ int main(int argc, char **argv) {
             sprite_shader.SetUniform("is_alive", astro.is_alive);
             sprite_shader.SetUniform("animation", astro.animate());
             glDrawArrays(GL_TRIANGLES, 0, 6);
-            if (!astro.is_alive && (current - astro.time_of_death) > 5){
+            if (!astro.is_alive && (current - astro.time_of_death) > 5) {
                 astro.respawn();
             }
         }
@@ -509,16 +542,39 @@ int main(int argc, char **argv) {
         glBindTexture(GL_TEXTURE_2D, texture1);
 
         glBindVertexArray(planeVAO);
-        model = translate4x4(cameraPos + float3(0.0f, -0.0f, -1.1f));
+        model = translate4x4(cameraPos + float3(0.0f, 0.0f, -1.1f));
         objects_shader.SetUniform("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 6);
+
+
         glBindVertexArray(0);
         objects_shader.StopUseShader();
+
+
+
+        font_shader.StartUseShader();
+        font_shader.SetUniform("view", view);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, digitstex);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, scoretex);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, healthtex);
+
+        glBindVertexArray(planeVAO);
+        draw_text_info(font_shader, int(score), int(health));
+
+        glBindVertexArray(0);
+        font_shader.StopUseShader();
 
 
         GL_CHECK_ERRORS;
 
         glfwSwapBuffers(window);
+        score += deltaTime;
+        health = health + deltaTime;
+        health = health > 100 ? 100 : health;
     }
 
     glDeleteVertexArrays(1, &VAO);
@@ -591,7 +647,6 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
 
 void mouse_button_callback(GLFWwindow *window, int button, int action, int mods){
     if (button == GLFW_MOUSE_BUTTON_2 && action == GLFW_PRESS){
-        shoot = true;
         double x, y;
         glfwGetCursorPos(window, &x, &y);
         cursorPos = normalize_cursor(x, y);
@@ -602,22 +657,29 @@ void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
     }
 }
 
+inline bool hit(Bullet &b, Asteroid &a){
+    return length(a.position - b.position) < 0.5;
+}
+
 void destroy_enemies(vector<Asteroid> &asteroids){
-    for (auto astro = asteroids.rbegin(); astro != asteroids.rend(); ++astro){
-        if (astro->is_alive){
-            auto b_l = float4(astro->position + float3(-0.5, -0.5, 0.0));
-            b_l = mul(projection, mul(view, b_l));
-            b_l /= b_l.w;
-            auto t_r = float4(astro->position + float3(0.5, 0.5, 0.0));
-            t_r = mul(projection, mul(view, t_r));
-            t_r /= t_r.w;
-            if (hit(b_l, t_r)){
-                astro->kill();
-                break;
+    for (auto bullet : temp_bullets){
+        for (auto astro = asteroids.rbegin(); astro != asteroids.rend(); ++astro){
+            if (astro->is_alive && bullet.actual){
+//            auto b_l = float4(astro->position + float3(-0.5, -0.5, 0.0));
+//            b_l = mul(projection, mul(view, b_l));
+//            b_l /= b_l.w;
+//            auto t_r = float4(astro->position + float3(0.5, 0.5, 0.0));
+//            t_r = mul(projection, mul(view, t_r));
+//            t_r /= t_r.w;
+                if (hit(bullet, *astro)){
+                    astro->kill();
+                    score += 25;
+                    bullet.actual = false;
+                    break;
+                }
             }
         }
     }
-    shoot = false;
 }
 
 void update_trash(vector<float3> &trash){
@@ -690,6 +752,57 @@ unsigned int loadTexture(char const *path) {
     }
 
     return textureID;
+}
+
+void draw_text_info(ShaderProgram &font_shader, int sc, int hea){
+    int s1 = sc / 1000;
+    int s2= sc / 100 % 10;
+    int s3 = sc / 10 % 10;
+    int s4 = sc % 10;
+    int h1 = hea / 100;
+    int h2 = hea / 10 % 10;
+    int h3 = hea % 10;
+    float4x4 model;
+    model = translate4x4(cameraPos + float3(-0.35f, -0.375f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", -1);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    model = translate4x4(cameraPos + float3(-0.4f, -0.4f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", s1);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    model = translate4x4(cameraPos + float3(-0.375f, -0.4f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", s2);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    model = translate4x4(cameraPos + float3(-0.35f, -0.4f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", s3);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    model = translate4x4(cameraPos + float3(-0.325f, -0.4f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", s4);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    model = translate4x4(cameraPos + float3(0.34f, -0.375f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", -2);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    model = translate4x4(cameraPos + float3(0.35f, -0.4f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", h1);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    model = translate4x4(cameraPos + float3(0.375f, -0.4f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", h2);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    model = translate4x4(cameraPos + float3(0.4f, -0.4f, -1.0f));
+    font_shader.SetUniform("model", model);
+    font_shader.SetUniform("number", h3);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
 

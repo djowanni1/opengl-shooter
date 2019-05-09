@@ -1,10 +1,23 @@
+//#version 330 core
+//out vec4 FragColor;
+//
+//in vec3 TexCoords;
+//
+//uniform samplerCube skybox;
+//uniform sampler2D bg;
+//void main() {
+//    FragColor = texture(bg, TexCoords);
+//    //FragColor = texture(skybox, TexCoords);
+//}
+
 #version 330 core
-out vec4 FragColor;
+in vec2 TexCoord;
 
-in vec3 TexCoords;
+out vec4 color;
 
-uniform samplerCube skybox;
+uniform sampler2D bg;
 
 void main() {
-    FragColor = texture(skybox, TexCoords);
+    //color = vec4(1.0);
+    color = texture(bg, TexCoord);
 }
