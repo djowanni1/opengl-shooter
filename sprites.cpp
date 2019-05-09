@@ -68,3 +68,21 @@ void Bullet::move() {
         actual = false;
     }
 }
+
+Fog::Fog(int tex):texture(tex), actual(true) {
+    std::uniform_real_distribution<> dis(5, 20);
+    std::uniform_int_distribution<> diss(0,1);
+    float x = diss(gen) == 0 ? dis(gen) : -dis(gen);
+    float y = diss(gen) == 0 ? dis(gen) : -dis(gen);
+    float z = -dis(gen) * 7;
+    position = LiteMath::float3(x, y, -100 + z);
+
+    speed = dis(gen) - 12.5;
+}
+
+void Fog::move(){
+    position += LiteMath::float3(0.0, 0.0, 1.0) * 50 * deltaTime;
+    if (position.z > -5){
+        actual = false;
+    }
+}

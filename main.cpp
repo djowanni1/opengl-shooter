@@ -16,6 +16,9 @@
 #include <random>
 #include <ctime>
 #include <list>
+//#include <assimp/Importer.hpp>
+//#include <assimp/scene.h>
+//#include <assimp/postprocess.h>
 
 using std::vector;
 using std::string;
@@ -76,6 +79,8 @@ inline float2 normalize_cursor(double x, double y){
 unsigned int loadCubemap(vector<std::string> faces);
 
 unsigned int loadTexture(char const *path);
+
+//void loadModel(const aiScene *loaded_obj, std::vector<GLfloat> &mesh, std::vector<GLfloat> &tex);
 
 void draw_text_info(ShaderProgram &font_shader, int sc, int hea);
 
@@ -150,10 +155,21 @@ int main(int argc, char **argv) {
     shaders[GL_FRAGMENT_SHADER] = "font_fs.glsl";
     ShaderProgram font_shader(shaders);
 
+//    shaders[GL_VERTEX_SHADER] = "ship_vs.glsl";
+//    shaders[GL_FRAGMENT_SHADER] = "ship_fs.glsl";
+//    ShaderProgram ship_shader(shaders);
+
+    shaders[GL_VERTEX_SHADER] = "fog_vs.glsl";
+    //shaders[GL_GEOMETRY_SHADER] = "fog_gs.glsl";
+    shaders[GL_FRAGMENT_SHADER] = "fog_fs.glsl";
+    ShaderProgram fog_shader(shaders);
+
     shaders[GL_VERTEX_SHADER] = "lines_vs.glsl";
     shaders[GL_GEOMETRY_SHADER] = "lines_gs.glsl";
     shaders[GL_FRAGMENT_SHADER] = "lines_fs.glsl";
     ShaderProgram lines_shader(shaders);
+
+
 
     glfwSwapInterval(1); // force 60 frames per second
 
@@ -336,10 +352,32 @@ int main(int argc, char **argv) {
 
     glBindVertexArray(0);
 
+//    Assimp::Importer importer;
+//    const aiScene *loaded_obj = importer.ReadFile("../models/ship1/WR.obj", aiProcess_Triangulate);
+//
+//    std::vector<GLfloat> ship1_mesh;
+//    std::vector<GLfloat> ship1_texture_coords;
+//    loadModel(loaded_obj, ship1_mesh, ship1_texture_coords);
+//    std::cout << ship1_mesh.size() << ' ' << ship1_texture_coords.size() << '\n';
+////    for (int i = 0; i < ship1_mesh.size(); i+=3){
+////        std::cout << ship1_mesh[i] << ' ' << ship1_mesh[i+1] << ' ' << ship1_mesh[i+2] << '\n';
+////    }
+//    GLuint shipVBO, shipVAO;
+//    glGenVertexArrays(1, &shipVAO);
+//    glGenBuffers(1, &shipVBO);
+//    glBindVertexArray(shipVAO);
+//    glBindBuffer(GL_ARRAY_BUFFER, shipVBO);
+//    glBufferData(GL_ARRAY_BUFFER, ship1_mesh.size() * sizeof(GLfloat), ship1_mesh.data(), GL_STATIC_DRAW);
+//
+//    GLuint shipLocation = 0;
+//    glEnableVertexAttribArray(shipLocation);
+//    glVertexAttribPointer(shipLocation, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid *) (0));
+//
+//    glBindVertexArray(0);
 
     /// Load and create a texture
     GLuint texture1 = loadTexture("../cockpit.png");
-
+    GLuint fog_tex = loadTexture("../fog.png");
     Sprite explosion1(loadTexture("../boom.png"), 9, 9, 81);
     Sprite asteroid1(loadTexture("../asteroid1.png"), 8, 8, 32);
     Sprite asteroid2(loadTexture("../asteroid2.png"), 5, 6, 30);
@@ -358,11 +396,14 @@ int main(int argc, char **argv) {
     GLuint digitstex = loadTexture("../digits.png");
     GLuint scoretex = loadTexture("../score.png");
     GLuint healthtex = loadTexture("../health.png");
+
+
+
     /// Presetting uniforms
     projection = transpose(
             projectionMatrixTransposed(45.0f, (GLfloat) WIDTH / (GLfloat) HEIGHT, 0.1f, 100.0f));
     proj_inv = inverse4x4(projection);
-
+    view = float4x4();
 
     objects_shader.StartUseShader();
     objects_shader.SetUniform("projection", projection);
@@ -377,6 +418,7 @@ int main(int argc, char **argv) {
 
     sky_shader.StartUseShader();
     sky_shader.SetUniform("projection", projection);
+    sky_shader.SetUniform("view", view);
     //sky_shader.SetUniform("skybox", 1);
     sky_shader.SetUniform("bg", 0);
     sky_shader.StopUseShader();
@@ -385,12 +427,20 @@ int main(int argc, char **argv) {
     lines_shader.SetUniform("projection", projection);
     lines_shader.StopUseShader();
 
+    fog_shader.StartUseShader();
+    fog_shader.SetUniform("projection", projection);
+    fog_shader.StopUseShader();
+
     font_shader.StartUseShader();
     font_shader.SetUniform("projection", projection);
     font_shader.SetUniform("Texture", 0);
     font_shader.SetUniform("score", 1);
     font_shader.SetUniform("health", 2);
     font_shader.StopUseShader();
+
+//    ship_shader.StartUseShader();
+//    ship_shader.SetUniform("projection", projection);
+//    ship_shader.StopUseShader();
 
     std::vector<Asteroid> asteroids = {
             Asteroid(asteroid1, explosion1),
@@ -409,10 +459,35 @@ int main(int argc, char **argv) {
             }
         }
     }
+//    std::vector<float3> fog_points;
+//    std::normal_distribution<> dis(0.0, 0.5);
+//    for (int i = 0; i < 10000; i++){
+////        float z = -10.0 + dis(gen) / 100;
+////        if (z < -5){
+////
+////        }
+//        fog_points.emplace_back(float3(dis(gen), dis(gen), dis(gen)));
+//
+//    }
 
 
 
     float4x4 model;
+    std::vector<Fog> fogs = {
+            Fog(fog_tex),
+            Fog(fog_tex),
+            Fog(fog_tex),
+            Fog(fog_tex),
+            Fog(fog_tex),
+            Fog(fog_tex),
+            Fog(fog_tex),
+            Fog(fog_tex),
+            Fog(fog_tex),
+            Fog(fog_tex),
+            Fog(fog_tex),
+            Fog(fog_tex),
+            Fog(fog_tex)
+    };
 
     while (!glfwWindowShouldClose(window) && health > 0) {
         glfwPollEvents();
@@ -439,14 +514,6 @@ int main(int argc, char **argv) {
         glDepthFunc(GL_LEQUAL);
         sky_shader.StartUseShader();
 
-        view.row[0].w = 0.0f;
-        view.row[1].w = 0.0f;
-        view.row[2].w = 0.0f;
-        sky_shader.SetUniform("view", view);
-
-
-//        glActiveTexture(GL_TEXTURE1);
-//        glBindTexture(GL_TEXTURE_CUBE_MAP, background_tex);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, bgt);
 
@@ -459,6 +526,36 @@ int main(int argc, char **argv) {
         //glDepthMask(GL_TRUE);
 
         view = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));
+
+
+        /// Fog
+        fog_shader.StartUseShader();
+        fog_shader.SetUniform("view", view);
+        std::sort(fogs.begin(), fogs.end(),
+                  [](const Fog &p1, Fog &p2) {
+                      return p1.position.z < p2.position.z;
+                  });
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, fog_tex);
+        glBindVertexArray(planeVAO);
+
+        for (auto &flying_fog : fogs){
+            if (flying_fog.actual == false){
+                flying_fog = Fog(fog_tex);
+                continue;
+            }
+            //std::uniform_real_distribution<> diss(1,2);
+            model = rotate_Z_4x4(lastFrame * flying_fog.speed / 2);
+            model.row[0].w = flying_fog.position.x;
+            model.row[1].w = flying_fog.position.y;
+            model.row[2].w = flying_fog.position.z;
+            fog_shader.SetUniform("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+
+            flying_fog.move();
+        }
+        fog_shader.StopUseShader();
+        glBindVertexArray(0);
 
         /// Sprites
         sprite_shader.StartUseShader();
@@ -500,14 +597,13 @@ int main(int argc, char **argv) {
         GL_CHECK_ERRORS;
 
         lines_shader.SetUniform("direction", float3(0.0, 0.0, 1.0));
-        lines_shader.SetUniform("incolor", float3(0.5, 0.5, 0.5));
+        lines_shader.SetUniform("incolor", float3(0.0, 0.5, 0.75));
         for (auto &trash : trash_points){
             model = translate4x4(trash);
             lines_shader.SetUniform("model", model);
             glDrawArrays(GL_POINTS, 0, 1);
         }
         update_trash(trash_points);
-        lines_shader.StartUseShader();
 
         /// Bullets
         lines_shader.SetUniform("incolor", float3(0.0, 1.0, 0.0));
@@ -526,10 +622,26 @@ int main(int argc, char **argv) {
                 bull = tmp;
             }
         }
-
+        lines_shader.StopUseShader();
 
         glBindVertexArray(0);
 
+
+
+
+
+//        for (auto &fog_off : fog_points){
+//            model = translate4x4(flying_fog.position + fog_off);
+//            fog_shader.SetUniform("model", model);
+//            glDrawArrays(GL_POINTS, 0, 1);
+//            flying_fog.move();
+//        }
+//        model = translate4x4(float3(0.0, 0.0, -10.0));
+//        fog_shader.SetUniform("model", model);
+//        glDrawArrays(GL_TRIANGLES, 0, 36);
+//
+//        glBindVertexArray(0);
+//        fog_shader.StopUseShader();
 
 
         /// objects
@@ -547,8 +659,10 @@ int main(int argc, char **argv) {
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
+
         glBindVertexArray(0);
         objects_shader.StopUseShader();
+
 
 
 
@@ -567,6 +681,21 @@ int main(int argc, char **argv) {
 
         glBindVertexArray(0);
         font_shader.StopUseShader();
+
+
+
+
+
+
+
+//        ship_shader.StartUseShader();
+//
+//        ship_shader.SetUniform("view", view);
+//        glBindVertexArray(shipVAO);
+//        model = translate4x4(float3(0.0f, 0.0f, -30.0f));
+//        ship_shader.SetUniform("model", model);
+//        glDrawArrays(GL_TRIANGLES, 0, ship1_mesh.size() / 3);
+//        //glDrawElements(GL_TRIANGLES, ship1_mesh.size() / 3, GL_UNSIGNED_INT, 0);
 
 
         GL_CHECK_ERRORS;
@@ -754,6 +883,8 @@ unsigned int loadTexture(char const *path) {
     return textureID;
 }
 
+
+
 void draw_text_info(ShaderProgram &font_shader, int sc, int hea){
     int s1 = sc / 1000;
     int s2= sc / 100 % 10;
@@ -805,4 +936,19 @@ void draw_text_info(ShaderProgram &font_shader, int sc, int hea){
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
-
+//void loadModel(const aiScene *loaded_obj, std::vector<GLfloat> &mesh, std::vector<GLfloat> &tex){
+//    for (int i = 0; i < loaded_obj->mNumMeshes; ++i){
+//        auto cur_mesh = loaded_obj->mMeshes[i];
+//        for (int j = 0; j < cur_mesh->mNumVertices; ++j){
+//            mesh.push_back(cur_mesh->mVertices->x);
+//            mesh.push_back(cur_mesh->mVertices->y);
+//            mesh.push_back(cur_mesh->mVertices->z);
+//        }
+//        if (cur_mesh->mTextureCoords[0] != nullptr){
+//            for (int j = 0; j < cur_mesh->mNumVertices; ++j) {
+//                tex.push_back(cur_mesh->mTextureCoords[0][j].x);
+//                tex.push_back(cur_mesh->mTextureCoords[0][j].y);
+//            }
+//        }
+//    }
+//}

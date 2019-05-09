@@ -83,4 +83,14 @@ public:
     void move();
 };
 
+class Fog{
+public:
+    bool actual;
+    LiteMath::float3 position;
+    unsigned texture;
+    float speed;
+    Fog(int tex);
+    void move();
+};
+
 #endif //MAIN_SPRITES_H
