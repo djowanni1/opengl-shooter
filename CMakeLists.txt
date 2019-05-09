@@ -32,7 +32,7 @@ endif ()
 include_directories(${ADDITIONAL_INCLUDE_DIRS})
 
 find_package(OpenGL REQUIRED)
-f3
+
 
 add_executable(main ${SOURCE_FILES})
 
