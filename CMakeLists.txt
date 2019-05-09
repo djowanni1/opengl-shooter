@@ -10,8 +10,8 @@ set(SOURCE_FILES
         ShaderProgram.h
         ShaderProgram.cpp sprites.h sprites.cpp)
 
-set(ADDITIONAL_INCLUDE_DIRS
-        dependencies/include/GLAD)
+set(ADDITIONAL_INCLUDE_DIRS dependencies/include/GLAD dependencies/include/SOIL)
+
 set(ADDITIONAL_LIBRARY_DIRS
         dependencies/lib)
 set(ADDITIONAL_RUNTIME_LIBRARY_DIRS
@@ -32,6 +32,7 @@ endif ()
 include_directories(${ADDITIONAL_INCLUDE_DIRS})
 
 find_package(OpenGL REQUIRED)
+f3
 
 add_executable(main ${SOURCE_FILES})
 
