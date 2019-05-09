@@ -266,50 +266,6 @@ int main(int argc, char **argv) {
     glBindVertexArray(0);
 
     // Sky VAO
-    /*float sky_vertices[] = {
-            // positions
-            -1.0f, 1.0f, -1.0f,
-            -1.0f, -1.0f, -1.0f,
-            1.0f, -1.0f, -1.0f,
-            1.0f, -1.0f, -1.0f,
-            1.0f, 1.0f, -1.0f,
-            -1.0f, 1.0f, -1.0f,
-
-            -1.0f, -1.0f, 1.0f,
-            -1.0f, -1.0f, -1.0f,
-            -1.0f, 1.0f, -1.0f,
-            -1.0f, 1.0f, -1.0f,
-            -1.0f, 1.0f, 1.0f,
-            -1.0f, -1.0f, 1.0f,
-
-            1.0f, -1.0f, -1.0f,
-            1.0f, -1.0f, 1.0f,
-            1.0f, 1.0f, 1.0f,
-            1.0f, 1.0f, 1.0f,
-            1.0f, 1.0f, -1.0f,
-            1.0f, -1.0f, -1.0f,
-
-            -1.0f, -1.0f, 1.0f,
-            -1.0f, 1.0f, 1.0f,
-            1.0f, 1.0f, 1.0f,
-            1.0f, 1.0f, 1.0f,
-            1.0f, -1.0f, 1.0f,
-            -1.0f, -1.0f, 1.0f,
-
-            -1.0f, 1.0f, -1.0f,
-            1.0f, 1.0f, -1.0f,
-            1.0f, 1.0f, 1.0f,
-            1.0f, 1.0f, 1.0f,
-            -1.0f, 1.0f, 1.0f,
-            -1.0f, 1.0f, -1.0f,
-
-            -1.0f, -1.0f, -1.0f,
-            -1.0f, -1.0f, 1.0f,
-            1.0f, -1.0f, -1.0f,
-            1.0f, -1.0f, -1.0f,
-            -1.0f, -1.0f, 1.0f,
-            1.0f, -1.0f, 1.0f
-    };*/
     float sky_vertices[] = {
             // positions
             -1.0f, 1.0f, -1.0f, 0.0f, 1.0f,
@@ -376,32 +332,22 @@ int main(int argc, char **argv) {
 //    glBindVertexArray(0);
 
     /// Load and create a texture
-    GLuint texture1 = loadTexture("../cockpit.png");
+    GLuint cockpit_tex = loadTexture("../cockpit.png");
     GLuint fog_tex = loadTexture("../fog.png");
+
     Sprite explosion1(loadTexture("../boom.png"), 9, 9, 81);
     Sprite asteroid1(loadTexture("../asteroid1.png"), 8, 8, 32);
     Sprite asteroid2(loadTexture("../asteroid2.png"), 5, 6, 30);
 
-//    vector <std::string> faces{
-//            "../bg/background.jpg",
-//            "../bg/background.jpg",
-//            "../bg/background.jpg",
-//            "../bg/background.jpg",
-//            "../bg/background.jpg",
-//            "../bg/background.jpg"
-//    };
-//    GLuint background_tex = loadCubemap(faces);
     GLuint bgt = loadTexture("../background.jpg");
 
-    GLuint digitstex = loadTexture("../digits.png");
-    GLuint scoretex = loadTexture("../score.png");
-    GLuint healthtex = loadTexture("../health.png");
-
+    GLuint digits_tex = loadTexture("../digits.png");
+    GLuint score_tex = loadTexture("../score.png");
+    GLuint health_tex = loadTexture("../health.png");
 
 
     /// Presetting uniforms
-    projection = transpose(
-            projectionMatrixTransposed(45.0f, (GLfloat) WIDTH / (GLfloat) HEIGHT, 0.1f, 100.0f));
+    projection = transpose(projectionMatrixTransposed(45.0f, (GLfloat) WIDTH / (GLfloat) HEIGHT, 0.1f, 100.0f));
     proj_inv = inverse4x4(projection);
     view = float4x4();
 
@@ -419,7 +365,6 @@ int main(int argc, char **argv) {
     sky_shader.StartUseShader();
     sky_shader.SetUniform("projection", projection);
     sky_shader.SetUniform("view", view);
-    //sky_shader.SetUniform("skybox", 1);
     sky_shader.SetUniform("bg", 0);
     sky_shader.StopUseShader();
 
@@ -459,35 +404,24 @@ int main(int argc, char **argv) {
             }
         }
     }
-//    std::vector<float3> fog_points;
-//    std::normal_distribution<> dis(0.0, 0.5);
-//    for (int i = 0; i < 10000; i++){
-////        float z = -10.0 + dis(gen) / 100;
-////        if (z < -5){
-////
-////        }
-//        fog_points.emplace_back(float3(dis(gen), dis(gen), dis(gen)));
-//
-//    }
-
-
 
     float4x4 model;
-    std::vector<Fog> fogs = {
-            Fog(fog_tex),
-            Fog(fog_tex),
-            Fog(fog_tex),
-            Fog(fog_tex),
-            Fog(fog_tex),
-            Fog(fog_tex),
-            Fog(fog_tex),
-            Fog(fog_tex),
-            Fog(fog_tex),
-            Fog(fog_tex),
-            Fog(fog_tex),
-            Fog(fog_tex),
-            Fog(fog_tex)
-    };
+    std::vector<Fog> fogs(15, Fog(fog_tex));
+//    = {
+//            Fog(fog_tex),
+//            Fog(fog_tex),
+//            Fog(fog_tex),
+//            Fog(fog_tex),
+//            Fog(fog_tex),
+//            Fog(fog_tex),
+//            Fog(fog_tex),
+//            Fog(fog_tex),
+//            Fog(fog_tex),
+//            Fog(fog_tex),
+//            Fog(fog_tex),
+//            Fog(fog_tex),
+//            Fog(fog_tex)
+//    };
 
     while (!glfwWindowShouldClose(window) && health > 0) {
         glfwPollEvents();
@@ -502,31 +436,17 @@ int main(int argc, char **argv) {
 
         view = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));
         view_inv = inverse4x4(view);
-        /// Start shader ->
-        /// set view and projection matrix ->
-        /// activate texture ->
-        /// bind VAO ->
-        /// model matrix + draw ->
-        /// unbind VAO -> stop shader
 
-        /// sky
-        //glDepthMask(GL_FALSE);
+        /// Sky
         glDepthFunc(GL_LEQUAL);
         sky_shader.StartUseShader();
-
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, bgt);
-
         glBindVertexArray(skyVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
-
         glBindVertexArray(0);
         sky_shader.StopUseShader();
         glDepthFunc(GL_LESS);
-        //glDepthMask(GL_TRUE);
-
-        view = transpose(lookAtTransposed(cameraPos, cameraPos + cameraFront, cameraUp));
-
 
         /// Fog
         fog_shader.StartUseShader();
@@ -544,8 +464,7 @@ int main(int argc, char **argv) {
                 flying_fog = Fog(fog_tex);
                 continue;
             }
-            //std::uniform_real_distribution<> diss(1,2);
-            model = rotate_Z_4x4(lastFrame * flying_fog.speed / 2);
+            model = rotate_Z_4x4(lastFrame * flying_fog.speed / 3);
             model.row[0].w = flying_fog.position.x;
             model.row[1].w = flying_fog.position.y;
             model.row[2].w = flying_fog.position.z;
@@ -559,9 +478,7 @@ int main(int argc, char **argv) {
 
         /// Sprites
         sprite_shader.StartUseShader();
-
         sprite_shader.SetUniform("view", view);
-
 
         glBindVertexArray(planeVAO);
 
@@ -589,12 +506,11 @@ int main(int argc, char **argv) {
         sprite_shader.StopUseShader();
 
 
-        /// trash
+        /// Flying lines
         lines_shader.StartUseShader();
-
         lines_shader.SetUniform("view", view);
+
         glBindVertexArray(trashVAO);
-        GL_CHECK_ERRORS;
 
         lines_shader.SetUniform("direction", float3(0.0, 0.0, 1.0));
         lines_shader.SetUniform("incolor", float3(0.0, 0.5, 0.75));
@@ -626,67 +542,37 @@ int main(int argc, char **argv) {
 
         glBindVertexArray(0);
 
-
-
-
-
-//        for (auto &fog_off : fog_points){
-//            model = translate4x4(flying_fog.position + fog_off);
-//            fog_shader.SetUniform("model", model);
-//            glDrawArrays(GL_POINTS, 0, 1);
-//            flying_fog.move();
-//        }
-//        model = translate4x4(float3(0.0, 0.0, -10.0));
-//        fog_shader.SetUniform("model", model);
-//        glDrawArrays(GL_TRIANGLES, 0, 36);
-//
-//        glBindVertexArray(0);
-//        fog_shader.StopUseShader();
-
-
-        /// objects
+        /// Cockpit
         objects_shader.StartUseShader();
-
         objects_shader.SetUniform("view", view);
 
-
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture1);
+        glBindTexture(GL_TEXTURE_2D, cockpit_tex);
 
         glBindVertexArray(planeVAO);
         model = translate4x4(cameraPos + float3(0.0f, 0.0f, -1.1f));
         objects_shader.SetUniform("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 6);
-
-
-
         glBindVertexArray(0);
         objects_shader.StopUseShader();
 
-
-
+        /// Score-health info
 
         font_shader.StartUseShader();
         font_shader.SetUniform("view", view);
 
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, digitstex);
+        glBindTexture(GL_TEXTURE_2D, digits_tex);
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, scoretex);
+        glBindTexture(GL_TEXTURE_2D, score_tex);
         glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, healthtex);
+        glBindTexture(GL_TEXTURE_2D, health_tex);
 
         glBindVertexArray(planeVAO);
         draw_text_info(font_shader, int(score), int(health));
 
         glBindVertexArray(0);
         font_shader.StopUseShader();
-
-
-
-
-
-
 
 //        ship_shader.StartUseShader();
 //
