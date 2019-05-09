@@ -46,6 +46,8 @@ float lastFrame = 0.0f;
 float score = 0;
 float health = 100;
 
+bool cabine = false;
+
 std::mt19937 gen(time(0));
 
 list<Bullet> temp_bullets;
@@ -339,6 +341,7 @@ int main(int argc, char **argv) {
     Sprite ship1(loadTexture("../textures/ship1.png"), 1, 1, 1);
     Sprite ship2(loadTexture("../textures/ship2.png"), 1, 1, 1);
     Sprite ship3(loadTexture("../textures/ship3.png"), 1, 1, 1);
+    Sprite ship4(loadTexture("../textures/ship4.png"), 1, 1, 1);
 
     GLuint bgt = loadTexture("../textures/background.jpg");
 
@@ -394,7 +397,10 @@ int main(int argc, char **argv) {
             Enemy(asteroid2, explosion1, false),
             Enemy(asteroid2, explosion1, false),
             Enemy(ship1, explosion1, true),
+            Enemy(ship1, explosion1, true),
             Enemy(ship2, explosion1, true),
+            Enemy(ship2, explosion1, true),
+            Enemy(ship3, explosion1, true),
             Enemy(ship3, explosion1, true),
     };
 
@@ -410,7 +416,7 @@ int main(int argc, char **argv) {
     }
 
     float4x4 model;
-    std::vector<Fog> fogs(15, Fog(fog_tex));
+    std::vector<Fog> fogs(30, Fog(fog_tex));
 
     while (!glfwWindowShouldClose(window) && health > 0) {
         glfwPollEvents();
@@ -545,10 +551,17 @@ int main(int argc, char **argv) {
         objects_shader.SetUniform("view", view);
 
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, cockpit_tex);
-
+        if (cabine){
+            glBindTexture(GL_TEXTURE_2D, cockpit_tex);
+            model = translate4x4(cameraPos + float3(0.0f, 0.0f, -1.1f));
+        } else {
+            glBindTexture(GL_TEXTURE_2D, ship4.texture);
+            model = rotate_X_4x4(M_PI_2 + 0.1);
+            model.row[0].w = cameraPos.x;
+            model.row[1].w = cameraPos.y - 0.3;
+            model.row[2].w = cameraPos.z - 1.1;
+        }
         glBindVertexArray(planeVAO);
-        model = translate4x4(cameraPos + float3(0.0f, 0.0f, -1.1f));
         objects_shader.SetUniform("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
@@ -607,6 +620,16 @@ int main(int argc, char **argv) {
 void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode) {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
+    if (key == GLFW_KEY_F2 && !cabine){
+        cameraPos.y -= 2.0;
+        cameraPos.z -= 3.0;
+        cabine = true;
+    }
+    if (key == GLFW_KEY_F3 && cabine){
+        cameraPos.y += 2.0;
+        cameraPos.z += 3.0;
+        cabine = false;
+    }
     if (key >= 0 && key < 1024) {
         if (action == GLFW_PRESS)
             keys[key] = true;
@@ -618,17 +641,17 @@ void key_callback(GLFWwindow *window, int key, int scancode, int action, int mod
 void do_movement() {
     // Camera controls
     GLfloat cameraSpeed = 5.0f * deltaTime;
-    if (keys[GLFW_KEY_W])
-        cameraPos += cameraSpeed * cameraFront;
-    if (keys[GLFW_KEY_S])
-        cameraPos -= cameraSpeed * cameraFront;
-    if (keys[GLFW_KEY_R])
+//    if (keys[GLFW_KEY_W])
+//        cameraPos += cameraSpeed * cameraFront;
+//    if (keys[GLFW_KEY_S])
+//        cameraPos -= cameraSpeed * cameraFront;
+    if (keys[GLFW_KEY_W] && cameraPos.y < 5)
         cameraPos += cameraSpeed * cameraUp;
-    if (keys[GLFW_KEY_F])
+    if (keys[GLFW_KEY_S] && cameraPos.y > -5)
         cameraPos -= cameraSpeed * cameraUp;
-    if (keys[GLFW_KEY_A])
+    if (keys[GLFW_KEY_A] && cameraPos.x > -5)
         cameraPos -= normalize(cross(cameraFront, cameraUp)) * cameraSpeed;
-    if (keys[GLFW_KEY_D])
+    if (keys[GLFW_KEY_D] && cameraPos.x < 5)
         cameraPos += normalize(cross(cameraFront, cameraUp)) * cameraSpeed;
 }
 
@@ -777,43 +800,43 @@ void draw_text_info(ShaderProgram &font_shader, int sc, int hea){
     int h2 = hea / 10 % 10;
     int h3 = hea % 10;
     float4x4 model;
-    model = translate4x4(cameraPos + float3(-0.35f, -0.375f, -1.0f));
+    model = translate4x4(cameraPos + float3(-0.35f, 0.4f, -1.0f));
     font_shader.SetUniform("model", model);
     font_shader.SetUniform("number", -1);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
-    model = translate4x4(cameraPos + float3(-0.4f, -0.4f, -1.0f));
+    model = translate4x4(cameraPos + float3(-0.4f, 0.375f, -1.0f));
     font_shader.SetUniform("model", model);
     font_shader.SetUniform("number", s1);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    model = translate4x4(cameraPos + float3(-0.375f, -0.4f, -1.0f));
+    model = translate4x4(cameraPos + float3(-0.375f, 0.375f, -1.0f));
     font_shader.SetUniform("model", model);
     font_shader.SetUniform("number", s2);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    model = translate4x4(cameraPos + float3(-0.35f, -0.4f, -1.0f));
+    model = translate4x4(cameraPos + float3(-0.35f, 0.375f, -1.0f));
     font_shader.SetUniform("model", model);
     font_shader.SetUniform("number", s3);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
-    model = translate4x4(cameraPos + float3(-0.325f, -0.4f, -1.0f));
+    model = translate4x4(cameraPos + float3(-0.325f, 0.375f, -1.0f));
     font_shader.SetUniform("model", model);
     font_shader.SetUniform("number", s4);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
-    model = translate4x4(cameraPos + float3(0.34f, -0.375f, -1.0f));
+    model = translate4x4(cameraPos + float3(0.34f, 0.4f, -1.0f));
     font_shader.SetUniform("model", model);
     font_shader.SetUniform("number", -2);
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
-    model = translate4x4(cameraPos + float3(0.35f, -0.4f, -1.0f));
+    model = translate4x4(cameraPos + float3(0.35f, 0.375f, -1.0f));
     font_shader.SetUniform("model", model);
     font_shader.SetUniform("number", h1);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    model = translate4x4(cameraPos + float3(0.375f, -0.4f, -1.0f));
+    model = translate4x4(cameraPos + float3(0.375f, 0.375f, -1.0f));
     font_shader.SetUniform("model", model);
     font_shader.SetUniform("number", h2);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    model = translate4x4(cameraPos + float3(0.4f, -0.4f, -1.0f));
+    model = translate4x4(cameraPos + float3(0.4f, 0.375f, -1.0f));
     font_shader.SetUniform("model", model);
     font_shader.SetUniform("number", h3);
     glDrawArrays(GL_TRIANGLES, 0, 6);

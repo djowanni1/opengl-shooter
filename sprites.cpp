@@ -31,17 +31,19 @@ Enemy::Enemy(Sprite &astro, Sprite &boom, bool is_ship)
         : SpriteAnimator(astro), boom(boom),
           is_alive(true), is_ship(is_ship),
           time_of_shoot(time(0)) {
-    std::uniform_real_distribution<float> dis(-5, 5);
-    position = LiteMath::float3(dis(gen), dis(gen), zfar + dis(gen));
+    std::uniform_real_distribution<float> dis(-15, 15);
+    position = LiteMath::float3(dis(gen), dis(gen) + 5, zfar + dis(gen));
     direction = normalize(cameraPos - position);
 }
 
 LiteMath::float3x3 Enemy::animate() {
     if (is_alive) {
         position += direction * 10 * deltaTime;
-        if (position.z > cameraPos.z + 1) {
+        if (LiteMath::length(position - cameraPos) < 1.0) {
             health -= 25;
-            this->kill();
+            this->respawn();
+        } else if (position.z > cameraPos.z){
+            this->respawn();
         }
         return animation();
     } else {
@@ -56,8 +58,8 @@ void Enemy::kill() {
 
 void Enemy::respawn() {
     is_alive = true;
-    std::uniform_real_distribution<float> dis(-5, 5);
-    position = LiteMath::float3(dis(gen), dis(gen), zfar + dis(gen));
+    std::uniform_real_distribution<float> dis(-15, 15);
+    position = LiteMath::float3(dis(gen), dis(gen) / 2 + 5, zfar + dis(gen));
     direction = normalize(cameraPos - position);
     boom.new_boom();
 }
@@ -111,36 +113,4 @@ void Fog::move() {
         actual = false;
     }
 }
-//
-//Enemy::Enemy(unsigned texture, Sprite &boom) : texture(texture), boom(boom), is_alive(true) {
-//    std::uniform_real_distribution<float> dis(-5, 5);
-//    position = LiteMath::float3(dis(gen), dis(gen), zfar + dis(gen));
-//    direction = normalize(cameraPos - position);
-//    time_of_shoot = time(0);
-//}
-//
-//LiteMath::float3x3 Enemy::move() {
-//    if (is_alive) {
-//        position += direction * 10 * deltaTime;
-//        if (position.z > cameraPos.z + 1) {
-//            health -= 25;
-//            this->kill();
-//        }
-//        return LiteMath::float3x3();
-//    } else {
-//        return boom.animation();
-//    }
-//}
-//
-//void Enemy::kill() {
-//    is_alive = false;
-//    time_of_death = time(0);
-//}
-//
-//void Enemy::respawn() {
-//    is_alive = true;
-//    std::uniform_real_distribution<float> dis(-5, 5);
-//    position = LiteMath::float3(dis(gen), dis(gen), zfar + dis(gen));
-//    direction = normalize(cameraPos - position);
-//    boom.new_boom();
-//}
+
